@@ -1,0 +1,95 @@
+import React from "react";
+import { Truck, MapPin, Globe, AlertTriangle, PhoneCall } from "lucide-react";
+
+const DeliveryAreas = () => {
+  return (
+    <section className="py-24 bg-[#F8FAFC] font-poppins relative">
+      <div className="max-w-7xl mx-auto px-6">
+
+        <div className="flex flex-col lg:flex-row gap-16 items-center">
+
+          {/* Left Content */}
+          <div className="lg:w-1/2 space-y-8">
+            <div>
+              <h4 className="text-[#F2A31E] font-bold tracking-widest uppercase mb-2">We Deliver Happiness</h4>
+              <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">
+                Accessible Delivery Across <span className="text-[#1E60F2]">Tamil Nadu</span>
+              </h2>
+              <p className="text-gray-500 text-lg mt-6 leading-relaxed">
+                We ensure your celebration reaches you on time. Our specialized logistics network is designed to handle fireworks with care and safety.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="p-6 bg-white rounded-2xl shadow-lg border-l-4 border-[#1E60F2]">
+                <div className="flex items-center gap-3 mb-2">
+                  <MapPin className="text-[#1E60F2]" />
+                  <h3 className="font-bold text-lg">Local Districts</h3>
+                </div>
+                <p className="text-sm text-gray-500">Sivakasi, Virudhunagar, Madurai, and surrounding areas.</p>
+              </div>
+              <div className="p-6 bg-white rounded-2xl shadow-lg border-l-4 border-[#F2A31E]">
+                <div className="flex items-center gap-3 mb-2">
+                  <Truck className="text-[#F2A31E]" />
+                  <h3 className="font-bold text-lg">Transport Service</h3>
+                </div>
+                <p className="text-sm text-gray-500">Reliable lorry booking service for other districts in TN.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-orange-50 rounded-xl border border-orange-100">
+              <AlertTriangle className="text-orange-500 flex-shrink-0" />
+              <p className="text-sm text-gray-700 font-medium">
+                Note: For other states/bulk orders, please contact our support team directly.
+              </p>
+            </div>
+
+            <button className="flex items-center gap-3 px-8 py-4 bg-[#1E60F2] cursor-pointer
+            text-white rounded-full font-bold shadow-lg hover:bg-blue-700 transition-colors">
+              <PhoneCall size={20} />
+              Contact for Delivery Enquiry
+            </button>
+          </div>
+
+          {/* Right Visual / Map Representation */}
+          <div className="lg:w-1/2 w-full relative">
+            {/* Abstract Map Graphic */}
+            <div className="relative z-10 bg-white rounded-[3rem] p-8 shadow-2xl border
+             border-gray-100 overflow-hidden min-h-[400px] flex items-center justify-center ">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-orange-50/50"></div>
+
+              <div className="relative text-center space-y-6 z-20">
+                <div className="inline-block p-6 rounded-full bg-white shadow-xl animate-pulse">
+                  <Globe size={64} className="text-[#1E60F2]" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">Pan India Service</h3>
+                  <span className="px-4 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase">Wholesale Only</span>
+                </div>
+                <ul className="text-left space-y-3 text-gray-600 font-medium">
+                  <li className="flex items-center gap-2">✓ Minimum Order Value applies</li>
+                  <li className="flex items-center gap-2">✓ Lorry Transport Booking</li>
+                  <li className="flex items-center gap-2">✓ Safety Guidelines Followed</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Decor Elements */}
+            <div className="absolute -bottom-6 -right-6 w-full h-full 
+            bg-[#1E60F2]/5 rounded-[3rem] -z-10"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <style jsx>{`
+        .bg-grid-pattern {
+             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+             background-size: 20px 20px;
+        }
+      `}</style>
+    </section>
+  );
+};
+
+export default DeliveryAreas;

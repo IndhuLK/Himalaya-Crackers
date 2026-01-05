@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Playfair+Display:wght@500;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+
+    --font-family:'Poppins', sans-serif;
+    --font-primary: 'Playfair Display', serif;
+}
