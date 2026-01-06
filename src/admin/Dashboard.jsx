@@ -1,38 +1,71 @@
-import { 
-  ShoppingBag, 
-  AlertTriangle, 
-  CreditCard, 
-  Plus, 
-  Truck, 
-  TrendingUp, 
-  Sparkles 
+import { useState, useEffect } from "react";
+import {
+  ShoppingBag,
+  AlertTriangle,
+  CreditCard,
+  Plus,
+  Truck,
+  TrendingUp,
+  Sparkles
 } from "lucide-react";
-import { useOrders } from "./OrderContext";
-import { useProducts } from "./ProductContext";
+import { db } from "../config/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { isToday } from "date-fns";
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
-  const { orders, loading: ordersLoading } = useOrders();
-  const { products, loading: productsLoading } = useProducts();
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // 1. Today's Sales Calculation
+  useEffect(() => {
+    // 1. Fetch Orders
+    const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+      const orderList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setOrders(orderList);
+    });
+
+    // 2. Fetch Products
+    const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
+      const productList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProducts(productList);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubOrders();
+      unsubProducts();
+    };
+  }, []);
+
+  // --- STATS CALCULATIONS ---
+
+  // 1. Today's Sales
   const todaySales = orders
-    .filter(order => order.orderDate?.toDate && isToday(order.orderDate.toDate()))
+    .filter(order => {
+      if (!order.createdAt) return false;
+      const orderDate = order.createdAt.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+      return isToday(orderDate);
+    })
     .reduce((sum, order) => sum + (Number(order.total) || 0), 0);
 
   // 2. Total Orders
   const totalOrders = orders.length;
 
-  // 3. Pending Deliveries
+  // 3. Pending Deliveries (Pending, Processing, Shipped)
   const pendingDeliveries = orders.filter(
-    (order) => order.paymentStatus === "Pending" || order.status === "Processing"
+    (order) => ["Pending", "Processing", "Shipped"].includes(order.status)
   ).length;
 
-  // 4. Low Stock Alerts
-  const lowStockItems = products.filter((p) => (Number(p.stock) || 0) < 10);
+  // 4. Low Stock Alerts (Stock <= 10)
+  // Note: AddProduct.jsx uses 'stockQty', while some older files might use 'stock'. We check both.
+  const lowStockItems = products.filter((p) => {
+    const stock = p.stockQty !== undefined ? Number(p.stockQty) : (Number(p.stock) || 0);
+    return stock <= 10;
+  });
 
-  if (ordersLoading || productsLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center font-bold text-blue-600 animate-pulse">
         Fetching Himalaya Data...
@@ -56,7 +89,7 @@ export default function Dashboard() {
       {/* Main 4 Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: "Today's Sales", value: `₹${todaySales}`, icon: CreditCard, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Today's Sales", value: `₹${todaySales.toLocaleString()}`, icon: CreditCard, color: "text-emerald-600", bg: "bg-emerald-50" },
           { label: "Total Orders", value: totalOrders, icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50" },
           { label: "Pending Deliveries", value: pendingDeliveries, icon: Truck, color: "text-orange-600", bg: "bg-orange-50" },
           { label: "Low-Stock Alerts", value: lowStockItems.length, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
@@ -73,8 +106,8 @@ export default function Dashboard() {
 
       {/* Bottom Section: Forecast & Detailed Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Festival Demand Forecast */}
+
+        {/* Festival Demand Forecast (Static for now, can be dynamic later) */}
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
           <Sparkles className="absolute top-4 right-4 text-blue-300 opacity-50" size={40} />
           <div className="relative z-10">
@@ -82,7 +115,7 @@ export default function Dashboard() {
               <TrendingUp size={20} /> Festival Demand Forecast
             </h3>
             <p className="text-blue-100 text-sm mb-6">Based on previous season sales (Diwali/New Year)</p>
-            
+
             <div className="space-y-4">
               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                 <div className="flex justify-between text-sm font-bold mb-1">
@@ -120,7 +153,7 @@ export default function Dashboard() {
                 <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                   <span className="font-bold text-slate-700 text-sm">{item.name}</span>
                   <span className="bg-red-100 text-red-600 px-3 py-1 rounded-lg font-black text-xs">
-                    {item.stock} left
+                    {item.stockQty !== undefined ? item.stockQty : item.stock} left
                   </span>
                 </div>
               ))

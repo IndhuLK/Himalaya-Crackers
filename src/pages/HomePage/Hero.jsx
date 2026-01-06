@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import {Link} from "react-router-dom"
 
 const Hero = () => {
   const [slides, setSlides] = useState([]);
@@ -50,10 +51,13 @@ const Hero = () => {
         <p className="mb-6">{slide.desc}</p>
 
         {slide.buttonText && (
-          <button className="bg-[#F2A31E] px-8 py-4 rounded-full font-bold">
-            {slide.buttonText}
-          </button>
-        )}
+  <Link 
+    to="/products" 
+    className="inline-block bg-[#F2A31E] hover:bg-[#1E60F2] text-white px-8 py-4 rounded-full font-bold transition-colors text-center"
+  >
+    {slide.buttonText}
+  </Link>
+)}
       </div>
 
       <button

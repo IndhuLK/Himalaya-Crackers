@@ -1,9 +1,12 @@
-import React from "react"
+import React, { useState } from 'react';
 import { ShoppingBag, Boxes, PhoneCall, ArrowRight } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import BulkEnquiryPopup from '../../Context/BulkEnquiryPopup';
 
 const CTASection = () => {
   const navigate = useNavigate()
+
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
 
   return (
     <section className="relative py-28 bg-[#F8FAFC] font-poppins overflow-hidden">
@@ -34,7 +37,10 @@ const CTASection = () => {
 
           {/* SHOP NOW */}
           <button
-            onClick={() => navigate("/products")}
+            onClick={() => {
+    navigate("/products");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }}
             className="group flex flex-col gap-6 p-8 rounded-3xl bg-white text-gray-900 border border-gray-100 hover:border-[#F2A31E] shadow-md hover:shadow-xl transition-all"
           >
             <div className="w-14 h-14 rounded-full bg-[#1E60F2]/10 flex items-center justify-center">
@@ -55,8 +61,10 @@ const CTASection = () => {
 
           {/* BULK ORDER */}
           <button
-            onClick={() => navigate("/bulk-order")}
-            className="group flex flex-col gap-6 p-8 rounded-3xl bg-[#1E60F2] text-white hover:bg-blue-700 shadow-lg transition-all"
+            
+            className="group flex flex-col gap-6 p-8 rounded-3xl bg-[#1E60F2] text-white
+             hover:bg-blue-700 shadow-lg transition-all"
+             onClick={() => setIsPopupOpen(true)}
           >
             <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
               <Boxes />
@@ -76,7 +84,10 @@ const CTASection = () => {
 
           {/* CONTACT */}
           <button
-            onClick={() => navigate("/contact")}
+            onClick={() => {
+    navigate("/contact");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }}
             className="group flex flex-col gap-6 p-8 rounded-3xl bg-white text-gray-900 border border-gray-100 hover:border-[#1E60F2] shadow-md hover:shadow-xl transition-all"
           >
             <div className="w-14 h-14 rounded-full bg-[#F2A31E]/20 flex items-center justify-center">
@@ -97,6 +108,12 @@ const CTASection = () => {
 
         </div>
       </div>
+
+      {/* Popup Component */}
+      <BulkEnquiryPopup 
+        isOpen={isPopupOpen} 
+        onClose={() => setIsPopupOpen(false)} 
+      />
     </section>
   )
 }

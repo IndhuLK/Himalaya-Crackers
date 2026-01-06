@@ -5,6 +5,8 @@ import rocketsImg from "../../assets/rockets.png";
 import fancyCrackersImg from "../../assets/fancy_crackers.png";
 import giftBoxesImg from "../../assets/gift_boxes.png";
 
+import { Link } from "react-router-dom";
+
 const categories = [
   {
     id: "01",
@@ -66,19 +68,25 @@ const FeaturedCategories = () => {
               Explore Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1E60F2] to-[#033ab1]">Premium Range</span>
             </h2>
           </div>
-          <button className="hidden md:flex items-center gap-2 group px-6 py-3 cursor-pointer
-          bg-white text-black  font-semibold hover:bg-gray-800 transition-all border border-2
-          hover:text-white">
+          <Link to="/products">
+          <button className="hidden md:flex items-center gap-2 group px-8 py-3 bg-white 
+          text-slate-900 font-bold border-2 border-slate-900 hover:bg-slate-900
+           hover:text-white transition-all rounded-2xl shadow-lg cursor-pointer"
+            onClick={() => {
+    window.scrollTo({ top: 0, behavior: "smooth" })}}
+    >
             View All Products
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {categories.map((cat, index) => (
             <div
               key={cat.id}
-              className="group relative h-[320px]  overflow-hidden cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-500"
+              className="group relative h-[320px]  overflow-hidden cursor-pointer shadow-xl 
+              hover:shadow-2xl transition-all duration-500 rounded-3xl"
             >
               {/* Background Image */}
               <div className="absolute inset-0">

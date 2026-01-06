@@ -1,7 +1,9 @@
 import React from "react";
 import { Truck, MapPin, Globe, AlertTriangle, PhoneCall } from "lucide-react";
+import { useNavigate } from "react-router-dom"
 
 const DeliveryAreas = () => {
+   const navigate = useNavigate()
   return (
     <section className="py-24 bg-[#F8FAFC] font-poppins relative">
       <div className="max-w-7xl mx-auto px-6">
@@ -45,11 +47,15 @@ const DeliveryAreas = () => {
             </div>
 
             <button className="flex items-center gap-3 px-8 py-4 bg-[#1E60F2] cursor-pointer
-            text-white rounded-full font-bold shadow-lg hover:bg-blue-700 transition-colors">
+            text-white rounded-full font-bold shadow-lg hover:bg-blue-700 transition-colors"
+            onClick={() => {
+    navigate("/contact");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }}>
               <PhoneCall size={20} />
               Contact for Delivery Enquiry
             </button>
-          </div>
+          </div> 
 
           {/* Right Visual / Map Representation */}
           <div className="lg:w-1/2 w-full relative">

@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 // 1. Import Firebase tools
 import { db, storage } from "../config/firebase"; 
-import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function AddProduct() {
@@ -13,10 +13,12 @@ export default function AddProduct() {
   const location = useLocation();
 
   // 2. State for categories and loading
-  const [categories, setCategories] = useState(["1000 Wala", "Night Crackers"]); // Default categories
+  const [categories, setCategories] = useState([]); 
   const [newCatName, setNewCatName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  const [loadingCats, setLoadingCats] = useState(true);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,7 +29,7 @@ export default function AddProduct() {
     stockQty: "",
     noiseSubCategory: "",
     duration: "",
-    isGreen: true,
+    isGreen: false,
     longDescription: "",
     safetyInstructions: "",
     isBestSeller: false,
@@ -110,11 +112,29 @@ export default function AddProduct() {
     }
   };
 
-  const addNewCategory = () => {
-    if (newCatName.trim() && !categories.includes(newCatName)) {
-      setCategories([...categories, newCatName]);
-      setFormData({ ...formData, category: newCatName });
-      setNewCatName("");
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "categories"), (snap) => {
+      const catList = snap.docs.map(doc => doc.data().name);
+      setCategories(catList);
+      setLoadingCats(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const addNewCategory = async () => {
+    const formattedName = newCatName.trim();
+    if (formattedName && !categories.includes(formattedName)) {
+      try {
+        await addDoc(collection(db, "categories"), {
+          name: formattedName,
+          createdAt: serverTimestamp()
+        });
+        setFormData({ ...formData, category: formattedName });
+        setNewCatName("");
+      } catch (err) {
+        console.error("Error adding category", err);
+        alert("Failed to add category");
+      }
     }
   };
 
@@ -166,22 +186,24 @@ export default function AddProduct() {
           </div>
 
           {/* New Category UI */}
-          <div className="bg-[#0f172a] p-6 rounded-[2.5rem] text-white shadow-2xl space-y-4">
-            <h3 className="text-xl font-bold">New Category</h3>
-            <input 
-              type="text" 
-              placeholder="Category Name..." 
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button 
-              onClick={addNewCategory}
-              className="w-full bg-white text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
-            >
-              <PlusCircle size={18} /> ADD CATEGORY
-            </button>
-          </div>
+          {/* New Category Input UI */}
+      <div className="bg-[#0f172a] p-6 rounded-[2.5rem] text-white shadow-2xl space-y-4">
+        <h3 className="text-xl font-bold">Add New Category</h3>
+        <p className="text-xs text-slate-400 italic">*This will be saved permanently</p>
+        <input 
+          type="text" 
+          placeholder="e.g. Sparklers, Fancy Rockets" 
+          value={newCatName}
+          onChange={(e) => setNewCatName(e.target.value)}
+          className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button 
+          onClick={addNewCategory}
+          className="w-full bg-white text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+        >
+          <PlusCircle size={18} /> SAVE CATEGORY
+        </button>
+      </div>
 
           {/* Video URL */}
           <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl">
@@ -213,19 +235,20 @@ export default function AddProduct() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-semibold"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Categories Dropdown Section */}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
+        <select
+          value={formData.category}
+          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+          className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-semibold outline-none"
+        >
+          <option value="">{loadingCats ? "Loading..." : "Select Category"}</option>
+          {categories.map((cat, idx) => (
+            <option key={idx} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Sub Category</label>
@@ -240,7 +263,7 @@ export default function AddProduct() {
             </div>
 
             {/* Badges */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-50">
+            <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-50">
                 <label className={`flex items-center gap-3 p-4 rounded-2xl cursor-pointer ${formData.isBestSeller ? 'bg-orange-50 border-orange-200' : 'bg-slate-50'}`}>
                     <input type="checkbox" checked={formData.isBestSeller} onChange={(e)=>setFormData({...formData, isBestSeller: e.target.checked})} className="w-5 h-5 accent-orange-500" />
                     <span className="text-xs font-black uppercase text-orange-700">Best Seller</span>
@@ -252,6 +275,10 @@ export default function AddProduct() {
                 <label className={`flex items-center gap-3 p-4 rounded-2xl cursor-pointer ${formData.isOutOfStock ? 'bg-red-50 border-red-200' : 'bg-slate-50'}`}>
                     <input type="checkbox" checked={formData.isOutOfStock} onChange={(e)=>setFormData({...formData, isOutOfStock: e.target.checked})} className="w-5 h-5 accent-red-500" />
                     <span className="text-xs font-black uppercase text-red-700">Out of Stock</span>
+                </label>
+                <label className={`flex items-center gap-3 p-4 rounded-2xl cursor-pointer ${formData.isGreen ? 'bg-green-50 border-green-200' : 'bg-slate-50'}`}>
+                    <input type="checkbox" checked={formData.isGreen} onChange={(e)=>setFormData({...formData, isGreen: e.target.checked})} className="w-5 h-5 accent-green-500" />
+                    <span className="text-xs font-black uppercase text-green-700">Green Only</span>
                 </label>
             </div>
 
