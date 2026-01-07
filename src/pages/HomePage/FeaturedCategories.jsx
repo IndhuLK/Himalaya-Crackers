@@ -65,7 +65,7 @@ const FeaturedCategories = () => {
           {categories.map((cat) => (
             <Link 
               key={cat.id} 
-              to={cat.path}
+              to="/products"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               className="group flex flex-col items-center text-center"
             >
@@ -96,7 +96,9 @@ const FeaturedCategories = () => {
                 <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
                   {cat.title}
                 </h3>
-                <div className="flex items-center justify-center gap-1 text-sm font-medium text-gray-500 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                <div className="flex items-center justify-center gap-1 text-sm font-medium 
+                text-gray-500 opacity-0 group-hover:opacity-100 transform translate-y-2
+                 group-hover:translate-y-0 transition-all duration-300">
                   <span>View More</span>
                   <ArrowRight className="w-3 h-3" />
                 </div>
