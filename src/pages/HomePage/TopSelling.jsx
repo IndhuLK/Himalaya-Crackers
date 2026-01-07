@@ -74,76 +74,73 @@ const TopSelling = () => {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden"
-            >
-              {/* Image Container with Top-Left heavy rounding (Referencing uploaded image) */}
-              <div className="relative h-72 overflow-hidden m-3 rounded-tl-[3rem] rounded-tr-[1.5rem] rounded-bl-[1.5rem] rounded-br-[1.5rem]">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                
-                {/* Dark Overlay on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Product Grid */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-20">
+  {products.map((product) => (
+    <div key={product.id} className="group relative">
 
-                {/* Status Badges */}
-                <div className="absolute top-5 left-5">
-                  {product.tag && (
-                    <span className="bg-white/95 backdrop-blur-md text-[#1E60F2] text-[10px] font-black px-4 py-1.5 rounded-xl shadow-sm uppercase tracking-widest">
-                      {product.tag}
-                    </span>
-                  )}
-                </div>
+      {/* Image */}
+      <div className="relative h-80 overflow-hidden rounded-[2.5rem]">
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
 
-                {/* Wishlist Icon */}
-                <button className="absolute top-5 right-5 p-2.5 bg-white/90 backdrop-blur-md rounded-2xl text-slate-400 hover:text-red-500 transition-all shadow-sm hover:scale-110">
-                  <Heart size={20} />
-                </button>
-              </div>
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-              {/* Product Details Area */}
-              <div className="px-6 pb-6 pt-2">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black text-[#1E60F2] uppercase tracking-[0.15em]">
-                    {product.category}
-                  </span>
-                  <div className="flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-lg">
-                    <Flame size={12} className="text-orange-500" />
-                    <span className="text-[9px] font-black text-orange-600 uppercase">
-                      {product.noise}
-                    </span>
-                  </div>
-                </div>
+        {/* Tag */}
+        {product.tag && (
+          <span className="absolute top-5 left-5 bg-white/90 text-[#1E60F2]
+          text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
+            {product.tag}
+          </span>
+        )}
 
-                <h3 className="text-xl font-bold text-slate-800 mb-5 line-clamp-1 group-hover:text-[#1E60F2] transition-colors leading-tight">
-                  {product.name}
-                </h3>
+        {/* Wishlist */}
+        <button className="absolute top-5 right-5 p-2 bg-white/90 rounded-full
+        text-slate-400 hover:text-red-500 transition">
+          <Heart size={18} />
+        </button>
 
-                {/* Price and Cart Action Box */}
-                <div className="bg-slate-50 p-4 rounded-[2rem] flex items-center justify-between group-hover:bg-[#1E60F2]/5 transition-all border border-transparent group-hover:border-[#1E60F2]/10">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-2xl font-black text-slate-900 tracking-tight">₹{product.price}</span>
-                      <span className="text-xs text-slate-400 line-through font-medium">₹{product.mrp}</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight">
-                      Limited Time Offer
-                    </span>
-                  </div>
-                  
-                  <button className="w-12 h-12 bg-[#1E60F2] text-white rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all cursor-pointer">
-                    <ShoppingCart size={22} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Floating Cart */}
+        <button className="absolute bottom-5 right-5 w-12 h-12 bg-[#1E60F2]
+        text-white rounded-full flex items-center justify-center
+        hover:scale-110 transition">
+          <ShoppingCart size={20} />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="mt-6 space-y-3">
+
+        {/* Meta */}
+        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest">
+          <span className="text-[#1E60F2]">{product.category}</span>
+          <span className="flex items-center gap-1 text-orange-600">
+            <Flame size={12} />
+            {product.noise}
+          </span>
         </div>
+
+        {/* Name */}
+        <h3 className="text-xl font-black text-slate-900 leading-tight group-hover:text-[#1E60F2] transition">
+          {product.name}
+        </h3>
+
+        {/* Price */}
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-black text-slate-900">₹{product.price}</span>
+          <span className="text-sm line-through text-slate-400">₹{product.mrp}</span>
+        </div>
+
+        <div className="h-[2px] w-12 bg-[#1E60F2]/40"></div>
+      </div>
+    </div>
+  ))}
+</div>
+
 
         {/* Mobile View All Button */}
         <div className="mt-14 text-center md:hidden">

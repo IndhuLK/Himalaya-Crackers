@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '../../config/firebase'; // Adjust path if needed: ../../config/firebase
-import { useCart } from '../../context/CartContext'; // Adjust path
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { useCart } from '../../context/CartContext';
 import {
   ShoppingCart,
   Heart,
@@ -10,14 +10,16 @@ import {
   ShieldCheck,
   Flame,
   Clock,
-  Volume2,
   ChevronLeft,
   Minus,
   Plus,
   PlayCircle,
   Leaf,
   CheckCircle2,
-  AlertTriangle
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Info
 } from 'lucide-react';
 
 const ProductDetails = () => {
@@ -30,293 +32,188 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [zoomed, setZoomed] = useState(false);
+  const [openSection, setOpenSection] = useState('description');
 
-  // Fetch Product Data
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
       try {
         const docRef = doc(db, "products", id);
         const docSnap = await getDoc(docRef);
-
         if (docSnap.exists()) {
           const data = { id: docSnap.id, ...docSnap.data() };
           setProduct(data);
-
-          // Fetch Related Products (same category)
-          if (data.category) {
-            const q = query(
-              collection(db, "products"),
-              where("category", "==", data.category)
-            );
-            const querySnapshot = await getDocs(q);
-            const related = querySnapshot.docs
-              .map(d => ({ id: d.id, ...d.data() }))
-              .filter(p => p.id !== id) // Exclude current product
-              .slice(0, 4); // Keep max 4
-            setRelatedProducts(related);
-          }
-        } else {
-          console.log("No such product!");
+          
+          const q = query(collection(db, "products"), where("category", "==", data.category));
+          const querySnapshot = await getDocs(q);
+          setRelatedProducts(querySnapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => p.id !== id).slice(0, 4));
         }
-      } catch (error) {
-        console.error("Error fetching product:", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch (error) { console.error(error); } finally { setLoading(false); }
     };
-
     fetchProduct();
-    window.scrollTo(0, 0); // Scroll to top on load
+    window.scrollTo(0, 0);
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-10 h-10 border-2 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+    </div>
+  );
 
-  if (!product) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-        <h2 className="text-2xl font-black text-slate-800">Product Not Found</h2>
-        <button onClick={() => navigate('/products')} className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold">Back to Products</button>
-      </div>
-    );
-  }
+  if (!product) return <div className="p-20 text-center font-bold">Product not found.</div>;
 
-  // Stock Logic
-  const stock = Number(product.stockQty || product.stock || 0);
-  const isAvailable = stock > 0 && !product.isOutOfStock;
+  const isAvailable = Number(product.stockQty || product.stock || 0) > 0 && !product.isOutOfStock;
   const discount = Math.round(((product.mrpPrice - product.ourPrice) / product.mrpPrice) * 100);
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-  };
-
-  const handleBuyNow = () => {
-    addToCart(product, quantity);
-    // Open Cart or Navigate to Checkout (Assuming Cart is a sidebar that opens on add, otherwise navigate)
-    // For now, we'll just add to cart. If you have a checkout route, navigate there.
-  };
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-20">
-      {/* HEADER / BREADCRUMB */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-2 text-sm font-bold text-slate-400">
-          <button onClick={() => navigate('/products')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
-            <ChevronLeft size={16} /> All Products
+    <div className="min-h-screen bg-[#FDFDFD] text-slate-900">
+      {/* MINIMAL NAV */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <button onClick={() => navigate('/products')} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-all">
+            <ChevronLeft size={18} /> Back to Shop
           </button>
-          <span>/</span>
-          <span className="text-slate-800 truncate max-w-[200px]">{product.name}</span>
+          <div className="flex gap-4">
+            <button className="text-slate-400 hover:text-slate-900"><Share2 size={18}/></button>
+            <button className="text-slate-400 hover:text-rose-500"><Heart size={18}/></button>
+          </div>
         </div>
-      </div>
+      </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-
-          {/* LEFT COLUMN: IMAGES */}
-          <div className="space-y-6">
-            <div
-              className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden relative shadow-sm aspect-square group cursor-zoom-in"
-              onMouseEnter={() => setZoomed(true)}
-              onMouseLeave={() => setZoomed(false)}
-            >
-              <img
-                src={product.images?.[activeImage] || "https://placehold.co/600x600?text=No+Image"}
-                alt={product.name}
-                className={`w-full h-full object-cover transition-transform duration-500 ${zoomed ? 'scale-150' : 'scale-100'}`}
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
+          
+          {/* IMAGE GALLERY (Span 7) */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="aspect-square rounded-[3rem] overflow-hidden bg-white border border-slate-100 shadow-2xl shadow-slate-200/40 relative">
+              <img 
+                src={product.images?.[activeImage]} 
+                className="w-full h-full object-cover transition-transform duration-1000 hover:scale-110" 
+                alt={product.name} 
               />
-
               {!isAvailable && (
-                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none">
-                  <span className="bg-red-600 text-white font-black px-6 py-3 rounded-full uppercase tracking-widest shadow-xl">Out of Stock</span>
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
+                  <span className="bg-slate-900 text-white px-8 py-3 rounded-full font-black tracking-widest text-sm">SOLD OUT</span>
                 </div>
               )}
-
-              {/* Badges Over Image */}
-              <div className="absolute top-6 left-6 flex flex-col gap-2 pointer-events-none">
-                {product.isGreen && (
-                  <span className="bg-emerald-500 text-white p-2 rounded-xl shadow-lg border-2 border-white w-fit animate-in fade-in slide-in-from-left-4">
-                    <Leaf size={20} />
-                  </span>
-                )}
-                {product.isBestSeller && (
-                  <span className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg border border-white/20">
-                    🔥 BEST SELLER
-                  </span>
-                )}
-              </div>
             </div>
-
-            {/* Thumbnails */}
-            {product.images?.length > 1 && (
-              <div className="flex gap-4 overflow-x-auto pb-4">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImage(idx)}
-                    className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 ${activeImage === idx ? 'border-blue-600 ring-2 ring-blue-100' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                  >
-                    <img src={img} className="w-full h-full object-cover" alt="thumbnail" />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Video Section (Optional) */}
-            {product.videoUrl && (
-              <a
-                href={product.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-3 bg-slate-900 text-white p-4 rounded-2xl font-black uppercase hover:bg-slate-800 transition-all shadow-xl"
-              >
-                <PlayCircle size={20} className="text-red-500" /> Watch Demo Video
-              </a>
-            )}
+            
+            <div className="flex gap-4 overflow-x-auto pb-2 justify-center">
+              {product.images?.map((img, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => setActiveImage(i)}
+                  className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 ${activeImage === i ? 'border-blue-600 scale-105 shadow-lg' : 'border-transparent opacity-40'}`}
+                >
+                  <img src={img} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* RIGHT COLUMN: DETAILS */}
-          <div className="space-y-8">
-            <div className="space-y-4">
+          {/* PRODUCT INFO (Span 5) */}
+          <div className="lg:col-span-5 flex flex-col pt-4">
+            <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-black uppercase tracking-widest rounded-lg">
-                  {product.category || "General"}
+                <span className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                  {product.category}
                 </span>
-                <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
-                  <CheckCircle2 size={14} className="text-emerald-500" /> Verified Quality
-                </span>
+                {product.isBestSeller && <span className="flex items-center gap-1 text-[10px] font-black text-orange-500 uppercase tracking-widest"><Flame size={12}/> Best Seller</span>}
               </div>
 
-              <h1 className="text-4xl lg:text-5xl font-black text-slate-900 leading-tight tracking-tight">
+              <h1 className="text-5xl lg:text-6xl font-black tracking-tighter leading-[0.9] text-slate-900">
                 {product.name}
               </h1>
 
-              <div className="flex items-center gap-4">
-                <span className="text-xs bg-slate-100 px-3 py-1 rounded-full font-mono text-slate-500">
-                  {product.productCode || "SKU: 000"}
-                </span>
+              <div className="flex items-baseline gap-4 pt-2">
+                <span className="text-5xl font-black text-blue-600 tracking-tighter">₹{product.ourPrice}</span>
+                <span className="text-xl text-slate-300 line-through font-bold">₹{product.mrpPrice}</span>
+                <span className="text-emerald-500 font-black text-xs uppercase tracking-widest">{discount}% OFF</span>
               </div>
+
+              <p className="text-slate-400 text-sm font-medium">SKU: {product.productCode || product.id?.slice(0,8).toUpperCase()}</p>
             </div>
 
-            {/* Price Block */}
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 font-bold text-sm strikethrough decoration-2 decoration-red-400 line-through">₹{product.mrpPrice}</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-blue-600">₹{product.ourPrice}</span>
-                  <span className="bg-green-100 text-green-700 text-xs font-black px-2 py-1 rounded-lg">-{discount}% OFF</span>
-                </div>
+            {/* ACTION AREA */}
+            <div className="mt-10 p-2 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-200/50 flex flex-col sm:flex-row gap-2">
+              <div className="flex items-center justify-between bg-slate-50 rounded-[2rem] px-6 py-4 sm:w-44">
+                <button onClick={() => setQuantity(q => Math.max(1, q-1))} className="text-slate-400 hover:text-slate-900"><Minus size={18}/></button>
+                <span className="font-black text-xl">{quantity}</span>
+                <button onClick={() => setQuantity(q => q+1)} className="text-slate-400 hover:text-slate-900"><Plus size={18}/></button>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Availability</p>
-                {isAvailable ? (
-                  <p className="text-emerald-600 font-black flex items-center justify-end gap-1"><CheckCircle2 size={16} /> In Stock</p>
-                ) : (
-                  <p className="text-red-600 font-black flex items-center justify-end gap-1"><AlertTriangle size={16} /> Sold Out</p>
-                )}
-              </div>
-            </div>
-
-            {/* Quantity & Actions */}
-            <div className="bg-white p-2 rounded-[2rem] border border-slate-100 shadow-lg flex flex-col sm:flex-row gap-4">
-              <div className="flex items-center justify-between bg-slate-50 rounded-[1.5rem] p-2 min-w-[160px]">
-                <button
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-600 shadow-sm hover:scale-90 transition-transform disabled:opacity-50"
-                  disabled={!isAvailable}
-                >
-                  <Minus size={20} />
-                </button>
-                <span className="font-black text-xl text-slate-900">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(q => q + 1)}
-                  className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-blue-200 shadow-lg hover:scale-90 transition-transform disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none"
-                  disabled={!isAvailable}
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
-              <button
-                onClick={handleAddToCart}
+              <button 
+                onClick={() => addToCart(product, quantity)}
                 disabled={!isAvailable}
-                className="flex-1 bg-slate-900 text-white rounded-[1.5rem] font-bold text-lg hover:bg-slate-800 transition-colors py-4 flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                className="flex-1 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-[2rem] py-5 font-black text-lg transition-all flex items-center justify-center gap-3"
               >
-                <ShoppingCart size={20} /> Add to Cart
+                <ShoppingCart size={22} /> Add to Cart
               </button>
             </div>
 
-            {/* Info Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100">
-                <div className="flex items-center gap-2 mb-2 text-orange-600">
-                  <Flame size={20} />
-                  <span className="font-black uppercase text-xs tracking-widest">Intensity</span>
-                </div>
-                <p className="font-bold text-slate-800">{product.noiseLevel || "Medium Noise"}</p>
+            {/* QUICK SPECS */}
+            <div className="grid grid-cols-2 gap-4 mt-8">
+              <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100">
+                <Clock size={24} className="text-blue-500 mb-3" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duration</p>
+                <p className="font-black text-slate-800">{product.duration} Seconds</p>
               </div>
-              <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
-                <div className="flex items-center gap-2 mb-2 text-blue-600">
-                  <Clock size={20} />
-                  <span className="font-black uppercase text-xs tracking-widest">Duration</span>
-                </div>
-                <p className="font-bold text-slate-800">{product.duration ? `${product.duration} sec` : "Normal"}</p>
+              <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100">
+                <Zap size={24} className="text-yellow-500 mb-3" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Intensity</p>
+                <p className="font-black text-slate-800">{product.noiseLevel || 'High Impact'}</p>
               </div>
             </div>
 
-            {/* Descriptions */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-black text-lg text-slate-900 flex items-center gap-2 mb-3">
-                  <ShieldCheck className="text-emerald-500" /> Safety Instructions
-                </h3>
-                <div className="bg-slate-50 p-6 rounded-3xl text-sm font-medium text-slate-600 leading-relaxed border border-slate-100">
-                  {product.safetyInstructions || "Use in open areas only. Maintain safe distance. Adult supervision required."}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-black text-lg text-slate-900 mb-3">Product Description</h3>
-                <p className="text-slate-600 leading-relaxed">
-                  {product.longDescription || "This premium firework offers a spectacular display of lights and sounds, perfect for your celebrations. Made with high-quality materials for better performance and safety."}
-                </p>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* RELATED PRODUCTS */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-24">
-            <h2 className="text-3xl font-black text-slate-900 mb-8 italic uppercase tracking-tighter">You might also like</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {relatedProducts.map(rp => (
-                <div key={rp.id} className="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group cursor-pointer" onClick={() => navigate(`/product/${rp.id}`)}>
-                  <div className="h-48 bg-slate-50 rounded-3xl overflow-hidden mb-4 relative">
-                    <img src={rp.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt={rp.name} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">{rp.category}</p>
-                    <h4 className="font-bold text-slate-900 truncate mb-2">{rp.name}</h4>
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-900">₹{rp.ourPrice}</span>
-                      <span className="text-xs line-through text-slate-400">₹{rp.mrpPrice}</span>
-                    </div>
+            {/* MODERN DROPDOWNS */}
+            <div className="mt-10 space-y-1">
+              {[
+                { id: 'description', label: 'Product Details', icon: <Info size={18}/>, content: product.longDescription },
+                { id: 'safety', label: 'Safety Guidelines', icon: <ShieldCheck size={18}/>, content: product.safetyInstructions }
+              ].map((section) => (
+                <div key={section.id} className="border-b border-slate-100 last:border-0">
+                  <button 
+                    onClick={() => setOpenSection(openSection === section.id ? null : section.id)}
+                    className="w-full py-5 flex items-center justify-between group transition-all"
+                  >
+                    <span className="flex items-center gap-3 font-black text-xs uppercase tracking-[0.2em] text-slate-400 group-hover:text-blue-600 transition-colors">
+                      {section.icon} {section.label}
+                    </span>
+                    {openSection === section.id ? <ChevronUp size={18} className="text-blue-600"/> : <ChevronDown size={18} className="text-slate-300"/>}
+                  </button>
+                  <div className={`overflow-hidden transition-all duration-500 ease-in-out ${openSection === section.id ? 'max-h-96 pb-8' : 'max-h-0'}`}>
+                    <p className="text-slate-600 leading-relaxed text-base font-medium">
+                      {section.content || "Experience high-quality fireworks designed for safety and visual excellence."}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
+        </div>
 
-      </div>
+        {/* RELATED EFFECTS */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-32 border-t border-slate-100 pt-16">
+            <h3 className="text-3xl font-black tracking-tighter italic mb-12">COMPLEMENTARY EFFECTS</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+              {relatedProducts.map(rp => (
+                <div key={rp.id} onClick={() => navigate(`/product/${rp.id}`)} className="group cursor-pointer">
+                  <div className="aspect-square rounded-[2rem] bg-white border border-slate-100 overflow-hidden mb-5 shadow-sm group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-500">
+                    <img src={rp.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  </div>
+                  <h4 className="font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase text-sm tracking-tight">{rp.name}</h4>
+                  <div className="flex gap-2 mt-1">
+                    <span className="font-black text-blue-600">₹{rp.ourPrice}</span>
+                    <span className="text-slate-300 line-through font-bold text-sm">₹{rp.mrpPrice}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
     </div>
   );
 };
