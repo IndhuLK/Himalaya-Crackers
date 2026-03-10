@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import {
   Trash2,
   Plus,
@@ -7,7 +7,7 @@ import {
   UploadCloud,
   Loader2,
   Image as ImageIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
 import {
   collection,
@@ -17,15 +17,11 @@ import {
   doc,
   onSnapshot,
   serverTimestamp,
-} from "firebase/firestore";
+} from 'firebase/firestore';
 
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-import { db, storage } from "../config/firebase";
+import { db, storage } from '../config/firebase';
 
 export default function SliderManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,18 +31,18 @@ export default function SliderManagement() {
 
   const emptyBanner = {
     id: null,
-    image: "",
-    title: "",
-    subtitle: "",
-    desc: "",
-    buttonText: "",
+    image: '',
+    title: '',
+    subtitle: '',
+    desc: '',
+    buttonText: '',
   };
 
   const [currentBanner, setCurrentBanner] = useState(emptyBanner);
 
   /* 🔥 REALTIME FIRESTORE */
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "homeBanners"), (snap) => {
+    const unsub = onSnapshot(collection(db, 'homeBanners'), (snap) => {
       const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
@@ -67,8 +63,8 @@ export default function SliderManagement() {
       const url = await getDownloadURL(imgRef);
       setCurrentBanner((prev) => ({ ...prev, image: url }));
     } catch (error) {
-      console.error("Upload error:", error);
-      alert("Failed to upload image.");
+      console.error('Upload error:', error);
+      alert('Failed to upload image.');
     } finally {
       setUploading(false);
     }
@@ -77,7 +73,7 @@ export default function SliderManagement() {
   /* 💾 SAVE/UPDATE */
   const handleBannerSave = async () => {
     if (!currentBanner.image) {
-      alert("Please upload an image first!");
+      alert('Please upload an image first!');
       return;
     }
 
@@ -85,17 +81,17 @@ export default function SliderManagement() {
     try {
       const bannerData = {
         image: currentBanner.image,
-        title: currentBanner.title || "",
-        subtitle: currentBanner.subtitle || "",
-        desc: currentBanner.desc || "",
-        buttonText: currentBanner.buttonText || "",
+        title: currentBanner.title || '',
+        subtitle: currentBanner.subtitle || '',
+        desc: currentBanner.desc || '',
+        buttonText: currentBanner.buttonText || '',
         updatedAt: serverTimestamp(),
       };
 
       if (currentBanner.id) {
-        await updateDoc(doc(db, "homeBanners", currentBanner.id), bannerData);
+        await updateDoc(doc(db, 'homeBanners', currentBanner.id), bannerData);
       } else {
-        await addDoc(collection(db, "homeBanners"), {
+        await addDoc(collection(db, 'homeBanners'), {
           ...bannerData,
           createdAt: Date.now(),
         });
@@ -104,8 +100,8 @@ export default function SliderManagement() {
       setIsModalOpen(false);
       setCurrentBanner(emptyBanner);
     } catch (error) {
-      console.error("Save error:", error);
-      alert("Error saving slider. Check Firebase permissions.");
+      console.error('Save error:', error);
+      alert('Error saving slider. Check Firebase permissions.');
     } finally {
       setIsSaving(false);
     }
@@ -113,60 +109,77 @@ export default function SliderManagement() {
 
   /* 🗑 DELETE */
   const handleDeleteBanner = async (id) => {
-    if (window.confirm("Are you sure you want to delete this slider?")) {
-      await deleteDoc(doc(db, "homeBanners", id));
+    if (window.confirm('Are you sure you want to delete this slider?')) {
+      await deleteDoc(doc(db, 'homeBanners', id));
     }
   };
 
   return (
-    <div className="p-8 bg-[#f8fafc] min-h-screen text-slate-800">
+    <div className="p-6 bg-gray-50 min-h-screen">
       {/* HEADER */}
-      <div className="max-w-6xl mx-auto flex justify-between items-center mb-10">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            SLIDER <span className="text-blue-600">MANAGEMENT</span>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+            Slider Management
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your homepage hero banners</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Manage your homepage hero banners
+          </p>
         </div>
         <button
           onClick={() => {
             setCurrentBanner(emptyBanner);
             setIsModalOpen(true);
           }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-200 active:scale-95"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
         >
-          <Plus size={20} /> Add New Slider
+          <Plus size={16} /> Add New Slider
         </button>
       </div>
 
       {/* GRID LIST */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banners.map((b) => (
-          <div key={b.id} className="group bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300">
-            <div className="h-48 relative overflow-hidden">
-              <img src={b.image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={b.title} />
-              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex gap-3 items-center justify-center backdrop-blur-[2px]">
+          <div
+            key={b.id}
+            className="group bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+          >
+            <div className="h-40 relative overflow-hidden bg-gray-100 border-b border-gray-200">
+              <img
+                src={b.image}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                alt={b.title}
+              />
+              <div className="absolute inset-0 bg-gray-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 items-center justify-center backdrop-blur-sm">
                 <button
                   onClick={() => {
                     setCurrentBanner(b);
                     setIsModalOpen(true);
                   }}
-                  className="bg-white p-3 rounded-full text-blue-600 hover:bg-blue-50 transition-colors shadow-lg"
+                  className="bg-white p-2 rounded-md text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+                  title="Edit Slider"
                 >
-                  <Edit3 size={20} />
+                  <Edit3 size={18} />
                 </button>
                 <button
                   onClick={() => handleDeleteBanner(b.id)}
-                  className="bg-white p-3 rounded-full text-red-600 hover:bg-red-50 transition-colors shadow-lg"
+                  className="bg-white p-2 rounded-md text-red-600 hover:bg-red-50 transition-colors shadow-sm"
+                  title="Delete Slider"
                 >
-                  <Trash2 size={20} />
+                  <Trash2 size={18} />
                 </button>
               </div>
             </div>
-            <div className="p-5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500">{b.subtitle || "No Subtitle"}</span>
-              <h3 className="font-bold text-lg mt-1 line-clamp-1">{b.title || "Untitled Slider"}</h3>
-              <p className="text-slate-400 text-sm line-clamp-2 mt-2 leading-relaxed">{b.desc || "No description provided."}</p>
+            <div className="p-4 flex flex-col flex-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 mb-1">
+                {b.subtitle || 'No Subtitle'}
+              </span>
+              <h3 className="font-medium text-gray-900 text-sm line-clamp-1">
+                {b.title || 'Untitled Slider'}
+              </h3>
+              <p className="text-gray-500 text-xs line-clamp-2 mt-1 flex-1">
+                {b.desc || 'No description provided.'}
+              </p>
             </div>
           </div>
         ))}
@@ -174,48 +187,67 @@ export default function SliderManagement() {
 
       {/* MODERN MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            
-            <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="text-xl font-bold">Slider Details</h3>
-              <button 
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-xl rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-medium text-gray-900">
+                Slider Details
+              </h3>
+              <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-8 space-y-5">
+            <div className="p-6 space-y-6 overflow-y-auto">
               {/* IMAGE UPLOAD SLOT */}
               <div className="relative group">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 ml-1">Hero Image</label>
-                <div className={`relative h-44 rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden
-                  ${currentBanner.image ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-400'}`}>
-                  
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hero Image
+                </label>
+                <div
+                  className={`relative h-40 rounded-md border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden
+                  ${currentBanner.image ? 'border-blue-300 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'}`}
+                >
                   {uploading ? (
-                    <div className="flex flex-col items-center animate-pulse">
-                      <Loader2 className="animate-spin text-blue-500 mb-2" />
-                      <span className="text-sm font-medium text-blue-500">Uploading to Storage...</span>
+                    <div className="flex flex-col items-center">
+                      <Loader2
+                        className="animate-spin text-blue-600 mb-2"
+                        size={24}
+                      />
+                      <span className="text-xs text-gray-500">
+                        Uploading...
+                      </span>
                     </div>
                   ) : currentBanner.image ? (
                     <>
-                      <img src={currentBanner.image} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <p className="text-white text-xs font-bold bg-black/50 px-4 py-2 rounded-full backdrop-blur-md">Change Image</p>
+                      <img
+                        src={currentBanner.image}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gray-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <p className="text-white text-sm font-medium bg-gray-900/70 px-3 py-1.5 rounded-md">
+                          Change Image
+                        </p>
                       </div>
                     </>
                   ) : (
-                    <div className="text-center p-6">
-                      <div className="bg-white p-3 rounded-2xl shadow-sm inline-block mb-3">
-                        <UploadCloud className="text-blue-500" size={28} />
-                      </div>
-                      <p className="text-sm font-semibold text-slate-600">Click to browse or drag image</p>
-                      <p className="text-xs text-slate-400 mt-1">Recommended: 1920x1080px</p>
+                    <div className="text-center p-4">
+                      <UploadCloud
+                        className="text-gray-400 mx-auto mb-2"
+                        size={28}
+                      />
+                      <p className="text-sm font-medium text-gray-700">
+                        Click to browse image
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Recommended: 1920x1080px
+                      </p>
                     </div>
                   )}
-                  
+
                   <input
                     type="file"
                     accept="image/*"
@@ -227,62 +259,91 @@ export default function SliderManagement() {
 
               {/* INPUT FIELDS */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-1">Main Title</label>
+                <div className="col-span-2 space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Main Title
+                  </label>
                   <input
                     placeholder="Enter headline..."
                     value={currentBanner.title}
-                    onChange={(e) => setCurrentBanner({ ...currentBanner, title: e.target.value })}
-                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all outline-none"
+                    onChange={(e) =>
+                      setCurrentBanner({
+                        ...currentBanner,
+                        title: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-1">Subtitle</label>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Subtitle
+                  </label>
                   <input
                     placeholder="e.g. New Season"
                     value={currentBanner.subtitle}
-                    onChange={(e) => setCurrentBanner({ ...currentBanner, subtitle: e.target.value })}
-                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all outline-none"
+                    onChange={(e) =>
+                      setCurrentBanner({
+                        ...currentBanner,
+                        subtitle: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-1">Button Label</label>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Button Label
+                  </label>
                   <input
                     placeholder="e.g. Shop Now"
                     value={currentBanner.buttonText}
-                    onChange={(e) => setCurrentBanner({ ...currentBanner, buttonText: e.target.value })}
-                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all outline-none"
+                    onChange={(e) =>
+                      setCurrentBanner({
+                        ...currentBanner,
+                        buttonText: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-1">Description</label>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
                 <textarea
                   placeholder="Tell your customers more about this offer..."
                   value={currentBanner.desc}
-                  onChange={(e) => setCurrentBanner({ ...currentBanner, desc: e.target.value })}
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all outline-none h-24 resize-none"
+                  onChange={(e) =>
+                    setCurrentBanner({ ...currentBanner, desc: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 h-20 resize-none"
                 />
               </div>
+            </div>
 
-              {/* ACTION BUTTONS */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              {/* ACTION BUTTON */}
               <button
                 disabled={uploading || isSaving || !currentBanner.image}
                 onClick={handleBannerSave}
-                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2
-                  ${uploading || isSaving || !currentBanner.image 
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed" 
-                    : "bg-blue-600 hover:bg-blue-700 text-white active:scale-[0.98] shadow-blue-100"}`}
+                className={`px-5 py-2.5 rounded-md text-sm font-medium flex items-center justify-center gap-2 min-w-[120px] transition-colors
+                  ${
+                    uploading || isSaving || !currentBanner.image
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                  }`}
               >
                 {isSaving ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader2 className="animate-spin" size={16} />
                 ) : currentBanner.id ? (
-                  "Update Slider"
+                  'Update Slider'
                 ) : (
-                  "Publish Slider"
+                  'Publish Slider'
                 )}
               </button>
             </div>

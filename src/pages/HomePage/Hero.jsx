@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../config/firebase";
-import {Link} from "react-router-dom"
+import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { Link } from 'react-router-dom';
 
 const Hero = () => {
   const [slides, setSlides] = useState([]);
@@ -10,7 +10,7 @@ const Hero = () => {
 
   // 🔥 FIRESTORE LIVE DATA
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "homeBanners"), (snap) => {
+    const unsub = onSnapshot(collection(db, 'homeBanners'), (snap) => {
       const list = snap.docs.map((d) => d.data());
       setSlides(list);
     });
@@ -39,41 +39,47 @@ const Hero = () => {
       className="h-[75vh] relative flex items-center justify-center text-white"
       style={{
         backgroundImage: `url(${slide.image})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
       }}
     >
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
-      <div className="relative text-center max-w-3xl px-6">
-        <h1 className="text-5xl font-black mb-4">{slide.title}</h1>
-        <h2 className="text-xl font-bold mb-3">{slide.subtitle}</h2>
-        <p className="mb-6">{slide.desc}</p>
+      <div className="relative text-center max-w-4xl px-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4 leading-tight">
+          {slide.title}
+        </h1>
+        <h2 className="text-xl md:text-2xl font-medium text-gray-200 mb-4">
+          {slide.subtitle}
+        </h2>
+        <p className="mb-8 text-gray-300 md:text-lg max-w-2xl mx-auto leading-relaxed">
+          {slide.desc}
+        </p>
 
         {slide.buttonText && (
-  <Link 
-    to="/products" 
-    className="inline-block bg-[#F2A31E] hover:bg-[#1E60F2] text-white px-8 py-4 rounded-full font-bold transition-colors text-center"
-  >
-    {slide.buttonText}
-  </Link>
-)}
+          <Link
+            to="/products"
+            className="inline-block bg-white text-gray-900 hover:bg-gray-50 px-8 py-3.5 rounded-full font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+          >
+            {slide.buttonText}
+          </Link>
+        )}
       </div>
 
       <button
         onClick={() =>
           setCurrent(current === 0 ? slides.length - 1 : current - 1)
         }
-        className="absolute left-4 p-3 bg-black/40 rounded-full"
+        className="absolute left-4 md:left-8 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all text-white border border-white/10"
       >
-        <ChevronLeft />
+        <ChevronLeft size={24} />
       </button>
 
       <button
         onClick={() => setCurrent((current + 1) % slides.length)}
-        className="absolute right-4 p-3 bg-black/40 rounded-full"
+        className="absolute right-4 md:right-8 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all text-white border border-white/10"
       >
-        <ChevronRight />
+        <ChevronRight size={24} />
       </button>
     </section>
   );

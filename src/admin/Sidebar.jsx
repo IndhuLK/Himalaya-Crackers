@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingBag,
   Package,
@@ -8,123 +8,180 @@ import {
   ListChecks,
   ChevronDown,
   LogOut,
+  BarChart,
   Settings,
-  Sparkles,
-} from "lucide-react";
-import { useState } from "react";
+} from 'lucide-react';
+import { useState } from 'react';
 
 const menus = [
   {
-    name: "Dashboard",
-    path: "/dashboard",
-    icon: <LayoutDashboard size={20} />,
+    name: 'Dashboard',
+    path: '/dashboard',
+    icon: <LayoutDashboard size={18} />,
   },
   {
-    name: "Product Management",
-    icon: <Package size={20} />,
+    name: 'Items',
+    icon: <Package size={18} />,
     isSubmenu: true,
     subItems: [
-      { name: "Add Product", path: "/admin/add-product", icon: <PlusCircle size={18} /> },
-      { name: "Products List", path: "/admin/products", icon: <ListChecks size={18} /> },
+      {
+        name: 'New Item',
+        path: '/admin/add-product',
+        icon: <PlusCircle size={16} />,
+      },
+      {
+        name: 'Item List',
+        path: '/admin/products',
+        icon: <ListChecks size={16} />,
+      },
     ],
   },
-  { name: "Inventory Management", path: "/admin/inventory", icon: <ShoppingBag size={20} /> },
-  { name: "Orders Management", path: "/admin/orders", icon: <ShoppingBag size={20} /> },
-  { name: "Slider Management", path: "/admin/slider-management", icon: <Images size={20} /> },
+  { name: 'Inventory', path: '/admin/inventory', icon: <BarChart size={18} /> },
+  {
+    name: 'Sales Orders',
+    path: '/admin/orders',
+    icon: <ShoppingBag size={18} />,
+  },
+  {
+    name: 'Store Sliders',
+    path: '/admin/slider-management',
+    icon: <Images size={18} />,
+  },
 ];
 
-export default function Sidebar({ isOpen, setIsOpen, isMobile, navbarHeight = "top-0" }) {
+export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [expandedMenus, setExpandedMenus] = useState({ "Product Management": true });
+  const [expandedMenus, setExpandedMenus] = useState({ Items: true });
 
   const toggleSubmenu = (name) => {
     setExpandedMenus((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
   const handleLogout = () => {
-    // Add logout logic here
-    navigate("/login");
+    navigate('/login');
   };
 
   const sidebarClasses = `
-    border-r border-slate-100 z-40 transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)]
-    backdrop-blur-xl bg-white/90 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
-    ${isMobile ? "fixed top-0 left-0 h-screen" : `sticky ${navbarHeight} h-[calc(100vh-88px)] shrink-0`}
-    ${isOpen ? "translate-x-0 w-72" : `${isMobile ? "-translate-x-full" : "w-20"} lg:translate-x-0`}
+    bg-[#1e222d] text-gray-300 z-40 transition-all duration-300 flex flex-col shrink-0
+    ${isMobile ? 'fixed top-0 left-0 h-screen shadow-2xl' : 'sticky top-0 h-screen'}
+    ${isOpen ? 'translate-x-0 w-64' : `${isMobile ? '-translate-x-full w-64' : 'w-16'} xl:translate-x-0`}
   `;
 
   return (
     <>
       {isOpen && isMobile && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-0 lg:hidden" onClick={() => setIsOpen(false)} />
+        <div
+          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
       )}
 
       <aside className={sidebarClasses}>
-        <div className="flex flex-col h-full">
-          {/* Brand Header */}
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white italic">H</div>
-            {isOpen && (
-              <div className="leading-tight">
-                <h2 className="font-black text-blue-600 tracking-tighter">HIMALAYA</h2>
-                <p className="text-[10px] font-bold text-orange-500 uppercase">Crackers Admin</p>
-              </div>
-            )}
+        {/* Brand Header */}
+        <div className="h-16 flex items-center px-4 border-b border-gray-700/50 shrink-0">
+          <div className="w-8 h-8 rounded shrink-0 bg-blue-600 flex items-center justify-center font-bold text-white text-lg">
+            H
           </div>
+          {isOpen && (
+            <div className="ml-3 truncate">
+              <h2 className="font-semibold text-white tracking-wide text-sm">
+                Himalaya Books
+              </h2>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                Enterprise Ed.
+              </p>
+            </div>
+          )}
+        </div>
 
-          <nav className="flex-1 px-4 space-y-1 overflow-y-auto customs-scrollbar">
-            {menus.map((item, index) => {
-              const isSubmenu = item.isSubmenu;
-              const isActive = location.pathname === item.path;
-              const isChildActive = isSubmenu && item.subItems.some(sub => location.pathname === sub.path);
-              const isExpanded = expandedMenus[item.name];
+        <nav className="flex-1 py-4 space-y-1 overflow-y-auto overflow-x-hidden customs-scrollbar">
+          {menus.map((item, index) => {
+            const isSubmenu = item.isSubmenu;
+            const isActive = location.pathname === item.path;
+            const isChildActive =
+              isSubmenu &&
+              item.subItems.some((sub) => location.pathname === sub.path);
+            const isExpanded = expandedMenus[item.name];
 
-              if (isSubmenu) {
-                return (
-                  <div key={index} className="space-y-1">
-                    <button
-                      onClick={() => !isOpen ? setIsOpen(true) : toggleSubmenu(item.name)}
-                      className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl transition-all ${isChildActive ? "bg-blue-50 text-blue-600" : "hover:bg-slate-50 text-slate-500"}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={isChildActive ? "text-blue-600" : "text-slate-400"}>{item.icon}</span>
-                        {isOpen && <span className="text-sm font-bold">{item.name}</span>}
-                      </div>
-                      {isOpen && <ChevronDown size={14} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />}
-                    </button>
-                    {isOpen && isExpanded && (
-                      <div className="ml-9 space-y-1 border-l-2 border-slate-100 pl-4">
-                        {item.subItems.map(sub => (
-                          <Link key={sub.path} to={sub.path} className={`block py-2 text-sm font-medium ${location.pathname === sub.path ? "text-orange-500" : "text-slate-500 hover:text-blue-600"}`}>
-                            {sub.name}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
+            const activeClass =
+              isActive || isChildActive
+                ? 'bg-[#2b303b] text-white border-l-4 border-blue-500'
+                : 'border-l-4 border-transparent hover:bg-[#2b303b]/50 hover:text-gray-100';
 
+            if (isSubmenu) {
               return (
-                <Link
-                  key={index}
-                  to={item.path}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-2xl transition-all ${isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-500 hover:bg-slate-50"}`}
-                >
-                  <span className={isActive ? "text-white" : "text-slate-400"}>{item.icon}</span>
-                  {isOpen && <span className="text-sm font-bold">{item.name}</span>}
-                </Link>
+                <div key={index} className="flex flex-col">
+                  <button
+                    onClick={() =>
+                      !isOpen ? setIsOpen(true) : toggleSubmenu(item.name)
+                    }
+                    className={`nav-item flex items-center justify-between px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
+                    title={!isOpen ? item.name : ''}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={
+                          isChildActive ? 'text-blue-400' : 'text-gray-400'
+                        }
+                      >
+                        {item.icon}
+                      </span>
+                      {isOpen && (
+                        <span className="text-sm font-medium">{item.name}</span>
+                      )}
+                    </div>
+                    {isOpen && (
+                      <ChevronDown
+                        size={14}
+                        className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    )}
+                  </button>
+                  {isOpen && isExpanded && (
+                    <div className="bg-[#181a24] py-1">
+                      {item.subItems.map((sub) => (
+                        <Link
+                          key={sub.path}
+                          to={sub.path}
+                          className={`block py-2 pl-12 pr-4 text-sm transition-colors ${location.pathname === sub.path ? 'text-blue-400 font-medium' : 'text-gray-400 hover:text-gray-200'}`}
+                        >
+                          {sub.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
-            })}
-          </nav>
+            }
 
-          <div className="p-4 border-t border-slate-100">
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-2xl text-red-500 hover:bg-red-50 transition-all font-bold text-sm">
-              <LogOut size={20} />
-              {isOpen && <span>Sign Out</span>}
-            </button>
-          </div>
+            return (
+              <Link
+                key={index}
+                to={item.path}
+                title={!isOpen ? item.name : ''}
+                className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
+              >
+                <span className={isActive ? 'text-blue-400' : 'text-gray-400'}>
+                  {item.icon}
+                </span>
+                {isOpen && (
+                  <span className="text-sm font-medium">{item.name}</span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-3 border-t border-gray-700/50 shrink-0">
+          <button
+            onClick={handleLogout}
+            title={!isOpen ? 'Sign Out' : ''}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors text-sm font-medium ${!isOpen ? 'justify-center' : ''}`}
+          >
+            <LogOut size={18} />
+            {isOpen && <span>Sign Out</span>}
+          </button>
         </div>
       </aside>
     </>
