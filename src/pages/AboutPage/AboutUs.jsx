@@ -111,7 +111,7 @@ const AboutUs = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-20 space-y-16 md:space-y-20">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-8 md:gap-10 items-start">
-          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-7 md:p-10 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.35)]">
+          <div className="rounded-4xl border border-slate-200 bg-slate-50 p-7 md:p-10 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.35)]">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px w-10 bg-orange-400" />
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
@@ -175,7 +175,7 @@ const AboutUs = () => {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-7 md:p-10 shadow-[0_18px_55px_-34px_rgba(15,23,42,0.35)]">
+        <div className="rounded-4xl border border-slate-200 bg-white p-7 md:p-10 shadow-[0_18px_55px_-34px_rgba(15,23,42,0.35)]">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-8">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-500 mb-3">
@@ -204,7 +204,7 @@ const AboutUs = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 p-8 md:p-10 text-white">
+          <div className="relative overflow-hidden rounded-4xl bg-slate-950 p-8 md:p-10 text-white">
             <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
             <div className="relative z-10">
               <ShieldCheck className="text-orange-400 mb-5" size={34} />
@@ -228,7 +228,7 @@ const AboutUs = () => {
             />
           </div>
 
-          <div className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_48%,#f97316_100%)] p-8 md:p-10 text-white">
+          <div className="relative overflow-hidden rounded-4xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_48%,#f97316_100%)] p-8 md:p-10 text-white">
             <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
             <div className="relative z-10">
               <Leaf className="text-orange-300 mb-5" size={34} />
@@ -248,7 +248,7 @@ const AboutUs = () => {
           </div>
         </div>
 
-        <div className="rounded-[2rem] bg-slate-50 border border-slate-200 px-6 py-10 md:px-10 text-center">
+        <div className="rounded-4xl bg-slate-50 border border-slate-200 px-6 py-10 md:px-10 text-center">
           <h2 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 mb-7">
             Why customers stay with Himalaya
           </h2>
