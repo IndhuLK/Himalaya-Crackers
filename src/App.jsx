@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PublicLayout from './components/PublicLayout';
+import { ToastProvider } from './components/Toast';
 
 import Home from './pages/HomePage/Home';
 import Contact from './pages/ContactPage/Contact';
@@ -36,70 +37,81 @@ import RefundPolicy from './components/RefundPolicy';
 function App() {
   return (
     <>
-      <div>
-        <InventoryProvider>
-          <ProductProvider>
-            <OrderProvider>
-              <InProvider>
-                <BrowserRouter>
-                  <CartProvider>
-                    <Routes>
-                      <Route element={<PublicLayout />}>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/about" element={<AboutUs />} />
-                        <Route path="/contact" element={<Contact />} />
-                        <Route path="/products" element={<Product />} />
-                        <Route
-                          path="/product/:id"
-                          element={<ProductDetails />}
-                        />
-                        <Route path="/safety" element={<SafetyGuidelines />} />
-                        <Route
-                          path="/policy/green-crackers"
-                          element={<GreenPolicy />}
-                        />
-                        <Route
-                          path="/regulations"
-                          element={<GovernmentRegulations />}
-                        />
-                        <Route path="/faq" element={<FAQ />} />
-                        <Route path="/privacy" element={<PrivacyPolicy />} />
-                        <Route path="/terms" element={<TermsAndConditions />} />
-                        <Route path="/refund" element={<RefundPolicy />} />{' '}
-                      </Route>
+      <ToastProvider>
+        <div>
+          <InventoryProvider>
+            <ProductProvider>
+              <OrderProvider>
+                <InProvider>
+                  <BrowserRouter>
+                    <CartProvider>
+                      <Routes>
+                        <Route element={<PublicLayout />}>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/about" element={<AboutUs />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/products" element={<Product />} />
+                          <Route
+                            path="/product/:id"
+                            element={<ProductDetails />}
+                          />
+                          <Route
+                            path="/safety"
+                            element={<SafetyGuidelines />}
+                          />
+                          <Route
+                            path="/policy/green-crackers"
+                            element={<GreenPolicy />}
+                          />
+                          <Route
+                            path="/regulations"
+                            element={<GovernmentRegulations />}
+                          />
+                          <Route path="/faq" element={<FAQ />} />
+                          <Route path="/privacy" element={<PrivacyPolicy />} />
+                          <Route
+                            path="/terms"
+                            element={<TermsAndConditions />}
+                          />
+                          <Route
+                            path="/refund"
+                            element={<RefundPolicy />}
+                          />{' '}
+                        </Route>
 
-                      <Route path="/login" element={<Login />} />
-                      <Route element={<AdminLayout />}>
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route
-                          path="/admin/add-product"
-                          element={<AddProduct />}
-                        />
-                        <Route
-                          path="/admin/products"
-                          element={<ProductsList />}
-                        />
-                        <Route
-                          path="/admin/inventory"
-                          element={<InventoryManager />}
-                        />
-                        <Route
-                          path="/admin/orders"
-                          element={<OrderManagement />}
-                        />
-                        <Route
-                          path="/admin/slider-management"
-                          element={<SliderManagement />}
-                        />
-                      </Route>
-                    </Routes>
-                  </CartProvider>
-                </BrowserRouter>
-              </InProvider>
-            </OrderProvider>
-          </ProductProvider>
-        </InventoryProvider>
-      </div>
+                        <Route path="/login" element={<Login />} />
+                        <Route element={<AdminLayout />}>
+                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route
+                            path="/admin/add-product"
+                            element={<AddProduct />}
+                          />
+                          <Route
+                            path="/admin/products"
+                            element={<ProductsList />}
+                          />
+                          <Route
+                            path="/admin/inventory"
+                            element={<InventoryManager />}
+                          />
+                          <Route
+                            path="/admin/orders"
+                            element={<OrderManagement />}
+                          />
+                          <Route
+                            path="/admin/slider-management"
+                            element={<SliderManagement />}
+                          />
+                        </Route>
+                      </Routes>
+                    </CartProvider>
+                  </BrowserRouter>
+                </InProvider>
+              </OrderProvider>
+            </ProductProvider>
+          </InventoryProvider>
+        </div>
+      </ToastProvider>
     </>
   );
 }
