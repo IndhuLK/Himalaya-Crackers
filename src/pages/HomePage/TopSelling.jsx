@@ -51,30 +51,30 @@ const products = [
 
 const TopSelling = () => {
   return (
-    <section className="py-24 bg-[#F8FAFC] font-poppins">
+    <section className="py-20 bg-[#F8FAFC] font-poppins">
       <div className="max-w-7xl mx-auto px-6">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
           <div>
-            <h4 className="text-orange-600 font-semibold tracking-wider uppercase mb-2 text-sm">
+            <p className="text-orange-500 font-bold tracking-widest uppercase mb-2 text-xs">
               Customer Favorites
-            </h4>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight mb-2 capitalize">
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight capitalize">
               Top Selling <span className="text-[#1E60F2]">Crackers</span>
             </h2>
           </div>
           <Link to="/products">
             <button
-              className="hidden md:flex items-center gap-2 group px-8 py-3 bg-white
-          text-slate-900 font-bold border-2 border-slate-900 hover:bg-slate-900
-           hover:text-white transition-all rounded-2xl shadow-lg cursor-pointer"
+              className="hidden md:flex items-center gap-2 group px-6 py-2.5 bg-white
+          text-slate-900 font-bold border-2 border-slate-200 hover:border-[#1E60F2] hover:text-[#1E60F2]
+           transition-all rounded-full cursor-pointer"
               onClick={() => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             >
-              VIEW ALL PRODUCTS
+              View All
               <Zap
-                size={18}
+                size={16}
                 className="text-orange-500 group-hover:animate-pulse"
               />
             </button>
@@ -82,91 +82,81 @@ const TopSelling = () => {
         </div>
 
         {/* Product Grid */}
-        {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-20">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {products.map((product) => (
             <div key={product.id} className="group relative">
               {/* Image */}
-              <div className="relative h-80 overflow-hidden rounded-2xl shadow-sm border border-slate-100/50">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-sm bg-white border border-slate-100">
                 <img
                   src={product.image}
                   alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
 
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
                 {/* Tag */}
                 {product.tag && (
-                  <span
-                    className="absolute top-4 left-4 bg-white/95 backdrop-blur text-[#1E60F2]
-          text-xs font-medium px-3 py-1 rounded-full shadow-sm"
-                  >
+                  <span className="absolute top-3 left-3 bg-white/95 backdrop-blur text-[#1E60F2] text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
                     {product.tag}
                   </span>
                 )}
 
                 {/* Wishlist */}
-                <button
-                  className="absolute top-5 right-5 p-2 bg-white/90 rounded-full
-        text-slate-400 hover:text-red-500 transition"
-                >
-                  <Heart size={18} />
+                <button className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full text-slate-400 hover:text-red-500 transition-colors">
+                  <Heart size={15} />
                 </button>
 
                 {/* Floating Cart */}
-                <button
-                  className="absolute bottom-5 right-5 w-12 h-12 bg-[#1E60F2]
-        text-white rounded-full flex items-center justify-center
-        hover:scale-110 transition"
-                >
-                  <ShoppingCart size={20} />
+                <button className="absolute bottom-3 right-3 w-9 h-9 bg-[#1E60F2] text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 duration-300">
+                  <ShoppingCart size={15} />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="mt-5 space-y-2.5 px-1">
-                {/* Meta */}
-                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider">
+              <div className="mt-3 space-y-1.5 px-0.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
                   <span className="text-[#1E60F2]">{product.category}</span>
-                  <span className="flex items-center gap-1 text-orange-600">
-                    <Flame size={12} />
-                    {product.noise}
+                  <span className="flex items-center gap-0.5 text-orange-500">
+                    <Flame size={10} />
+                    {product.noise.replace(' Noise', '')}
                   </span>
                 </div>
 
-                {/* Name */}
-                <h3 className="text-lg font-bold text-slate-900 leading-tight group-hover:text-[#1E60F2] transition">
+                <h3 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-[#1E60F2] transition-colors">
                   {product.name}
                 </h3>
 
-                {/* Price */}
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-slate-900">
+                  <span className="text-base font-black text-slate-900">
                     ₹{product.price}
                   </span>
-                  <span className="text-sm line-through text-slate-400">
+                  <span className="text-xs line-through text-slate-400">
                     ₹{product.mrp}
                   </span>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                    {Math.round(
+                      ((product.mrp - product.price) / product.mrp) * 100
+                    )}
+                    % OFF
+                  </span>
                 </div>
-
-                <div className="h-[2px] w-12 bg-[#1E60F2]/40"></div>
               </div>
             </div>
           ))}
         </div>
 
         {/* Mobile View All Button */}
-        <div className="mt-14 text-center md:hidden">
-          <button
-            className="w-full py-3.5 bg-slate-900 text-white font-semibold text-sm rounded-xl shadow-md active:scale-95 transition-transform"
-            onClick={() => {
-              window.location.href = '/products';
-            }}
+        <div className="mt-10 text-center md:hidden">
+          <Link
+            to="/products"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            View All Bestsellers
-          </button>
+            <button className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl shadow-md active:scale-95 transition-transform">
+              View All Bestsellers
+            </button>
+          </Link>
         </div>
       </div>
     </section>

@@ -45,81 +45,63 @@ const categories = [
 
 const FeaturedCategories = () => {
   return (
-    <section className="py-20 bg-gray-50 relative overflow-hidden font-poppins">
-      {/* Decorative Blobs */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-orange-200 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-blue-200 rounded-full blur-3xl animate-pulse"></div>
-      </div>
+    <section className="py-20 bg-white relative overflow-hidden font-poppins">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="text-center mb-16">
-          <h4 className="text-orange-600 font-semibold tracking-wider uppercase text-sm mb-3">
+        <div className="text-center mb-14">
+          <p className="text-orange-500 font-bold tracking-widest uppercase text-xs mb-3">
             Our Collections
-          </h4>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
-            Explore Our <span className="text-blue-600">Premium Range</span>
+          </p>
+          <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            Explore Our <span className="text-[#1E60F2]">Premium Range</span>
           </h2>
+          <div className="w-16 h-1 bg-gradient-to-r from-orange-400 to-[#1E60F2] mx-auto mt-4 rounded-full"></div>
         </div>
 
-        {/* Circular Grid Container */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 items-start">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
           {categories.map((cat) => (
             <Link
               key={cat.id}
               to="/products"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="group flex flex-col items-center text-center"
+              className="group relative"
             >
-              {/* The Rounded Circle Frame */}
-              <div className="relative w-40 h-40 md:w-52 md:h-52 mb-6 transition-all duration-500 transform group-hover:scale-105">
-                {/* Outer decorative ring */}
-                <div className="absolute inset-0 rounded-full border-2 border-dashed border-gray-200 group-hover:border-orange-400 group-hover:rotate-45 transition-all duration-700"></div>
+              <div className="relative aspect-square rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
+                <img
+                  src={cat.image}
+                  alt={cat.title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-                {/* Image Container */}
-                <div className="absolute inset-2 overflow-hidden rounded-full bg-white shadow-xl border-4 border-white">
-                  <img
-                    src={cat.image}
-                    alt={cat.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300"></div>
-                </div>
-
-                {/* Floating Icon Badge */}
-                <div
-                  className={`absolute bottom-2 right-2 p-3 rounded-full bg-gradient-to-br ${cat.color} text-white shadow-lg border-2 border-white transform group-hover:translate-y-[-5px] transition-transform duration-300`}
-                >
-                  {cat.icon}
-                </div>
-              </div>
-
-              {/* Title and Subtitle */}
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
-                  {cat.title}
-                </h3>
-                <div
-                  className="flex items-center justify-center gap-1 text-sm font-medium
-                text-gray-500 opacity-0 group-hover:opacity-100 transform translate-y-2
-                 group-hover:translate-y-0 transition-all duration-300"
-                >
-                  <span>View More</span>
-                  <ArrowRight className="w-3 h-3" />
+                {/* Content overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <div
+                    className={`inline-flex items-center justify-center p-2.5 rounded-xl bg-gradient-to-br ${cat.color} text-white mb-3 shadow-lg`}
+                  >
+                    {cat.icon}
+                  </div>
+                  <h3 className="text-lg md:text-xl font-bold text-white mb-1">
+                    {cat.title}
+                  </h3>
+                  <div className="flex items-center gap-1 text-white/70 text-sm font-medium opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                    <span>Explore</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
                 </div>
               </div>
             </Link>
           ))}
         </div>
 
-        {/* View All Button for Mobile/Desktop */}
-        <div className="mt-20 text-center">
+        <div className="mt-14 text-center">
           <Link
             to="/products"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <button className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white font-semibold rounded-full hover:bg-slate-800 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5">
+            <button className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white font-bold rounded-full hover:bg-[#1E60F2] hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 transform hover:-translate-y-0.5">
               View All Categories
               <ArrowRight className="w-4 h-4" />
             </button>

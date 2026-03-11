@@ -35,51 +35,88 @@ const Hero = () => {
   const slide = slides[current];
 
   return (
-    <section
-      className="h-[75vh] relative flex items-center justify-center text-white"
-      style={{
-        backgroundImage: `url(${slide.image})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+    <section className="relative h-[80vh] md:h-[85vh] overflow-hidden">
+      {/* Background Image with smooth transition */}
+      {slides.map((s, i) => (
+        <div
+          key={i}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            i === current ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{
+            backgroundImage: `url(${s.image})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      ))}
 
-      <div className="relative text-center max-w-4xl px-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4 leading-tight">
-          {slide.title}
-        </h1>
-        <h2 className="text-xl md:text-2xl font-medium text-gray-200 mb-4">
-          {slide.subtitle}
-        </h2>
-        <p className="mb-8 text-gray-300 md:text-lg max-w-2xl mx-auto leading-relaxed">
-          {slide.desc}
-        </p>
+      {/* Gradient Overlays */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        {slide.buttonText && (
-          <Link
-            to="/products"
-            className="inline-block bg-white text-gray-900 hover:bg-gray-50 px-8 py-3.5 rounded-full font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-          >
-            {slide.buttonText}
-          </Link>
-        )}
+      {/* Content */}
+      <div className="relative h-full flex items-center">
+        <div className="max-w-7xl mx-auto px-6 w-full">
+          <div className="max-w-3xl">
+            <div
+              key={current}
+              className="animate-in fade-in slide-in-from-bottom-6 duration-700"
+            >
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight mb-5 leading-[1.1]">
+                {slide.title}
+              </h1>
+              <h2 className="text-lg md:text-2xl font-medium text-white/80 mb-4">
+                {slide.subtitle}
+              </h2>
+              <p className="mb-8 text-white/60 md:text-lg max-w-xl leading-relaxed">
+                {slide.desc}
+              </p>
+
+              {slide.buttonText && (
+                <Link
+                  to="/products"
+                  className="inline-flex items-center gap-2 bg-white text-gray-900 hover:bg-orange-500 hover:text-white px-8 py-4 rounded-full font-bold transition-all duration-300 shadow-xl hover:shadow-orange-500/30 transform hover:-translate-y-0.5"
+                >
+                  {slide.buttonText}
+                  <ChevronRight size={18} />
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Slide Indicators */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2">
+        {slides.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              i === current
+                ? 'w-10 bg-white'
+                : 'w-4 bg-white/40 hover:bg-white/60'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Nav Arrows */}
       <button
         onClick={() =>
           setCurrent(current === 0 ? slides.length - 1 : current - 1)
         }
-        className="absolute left-4 md:left-8 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all text-white border border-white/10"
+        className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/25 backdrop-blur-md rounded-full transition-all duration-300 text-white border border-white/20 hover:scale-110"
       >
-        <ChevronLeft size={24} />
+        <ChevronLeft size={22} />
       </button>
 
       <button
         onClick={() => setCurrent((current + 1) % slides.length)}
-        className="absolute right-4 md:right-8 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all text-white border border-white/10"
+        className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/25 backdrop-blur-md rounded-full transition-all duration-300 text-white border border-white/20 hover:scale-110"
       >
-        <ChevronRight size={24} />
+        <ChevronRight size={22} />
       </button>
     </section>
   );
