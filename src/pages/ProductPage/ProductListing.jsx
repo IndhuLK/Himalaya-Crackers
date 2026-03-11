@@ -84,7 +84,7 @@ const ProductListing = () => {
   // PREMIUM FILTER UI
   // ----------------------------------------------------------------------
   const FilterElements = () => (
-    <div className="space-y-10">
+    <div className="space-y-7">
       {/* SEARCH */}
       <div className="relative group">
         <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
@@ -93,30 +93,30 @@ const ProductListing = () => {
         <input
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search magical sparks..."
-          className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-emerald-400 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all shadow-sm focus:shadow-emerald-100/50 focus:ring-4 focus:ring-emerald-50"
+          className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-emerald-400 rounded-xl py-2.5 pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-all shadow-sm focus:shadow-emerald-100/50 focus:ring-2 focus:ring-emerald-50"
         />
       </div>
 
       {/* CATEGORY */}
       <div>
-        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-800 tracking-[0.2em] uppercase mb-5">
-          <Filter size={14} className="text-emerald-500" />
+        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-800 tracking-[0.2em] uppercase mb-3">
+          <Filter size={13} className="text-emerald-500" />
           Collection
         </h4>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => handleCategoryChange(cat)}
-              className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeCategory === cat
-                  ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 translate-x-1'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20 translate-x-0.5'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               <span>{cat}</span>
               {activeCategory === cat && (
-                <ChevronRight size={16} className="text-emerald-400" />
+                <ChevronRight size={14} className="text-emerald-400" />
               )}
             </button>
           ))}
@@ -124,52 +124,82 @@ const ProductListing = () => {
       </div>
 
       {/* PRICE RANGE */}
-      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-        <div className="flex justify-between items-end mb-4">
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <div className="flex justify-between items-end mb-3">
           <h4 className="text-xs font-bold text-slate-800 tracking-[0.2em] uppercase">
             Max Price
           </h4>
-          <span className="text-lg font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">
+          <span className="text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md">
             ₹{priceRange}
           </span>
         </div>
         <style>{`
+          .custom-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+            cursor: pointer;
+            background: linear-gradient(
+              to right,
+              #10b981 0%,
+              #10b981 ${((priceRange - 100) / (20000 - 100)) * 100}%,
+              #e2e8f0 ${((priceRange - 100) / (20000 - 100)) * 100}%,
+              #e2e8f0 100%
+            );
+            transition: background 0.05s ease;
+          }
           .custom-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 22px;
-            height: 22px;
-            background: #10b981;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border: 3px solid #10b981;
             border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
+            cursor: grab;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: box-shadow 0.15s, transform 0.15s;
           }
           .custom-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
+            box-shadow: 0 0 0 6px rgba(16,185,129,0.15);
+          }
+          .custom-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.2);
+            box-shadow: 0 0 0 8px rgba(16,185,129,0.2);
           }
           .custom-slider::-moz-range-thumb {
-            width: 22px;
-            height: 22px;
-            background: #10b981;
-            border: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border: 3px solid #10b981;
             border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
+            cursor: grab;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: box-shadow 0.15s, transform 0.15s;
           }
           .custom-slider::-moz-range-thumb:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
+            box-shadow: 0 0 0 6px rgba(16,185,129,0.15);
+          }
+          .custom-slider::-moz-range-track {
+            height: 6px;
+            border-radius: 999px;
+            background: transparent;
           }
         `}</style>
         <input
           type="range"
           min="100"
           max="20000"
-          step="100"
+          step="1"
           value={priceRange}
-          onChange={(e) => setPriceRange(e.target.value)}
-          className="custom-slider w-full h-2 bg-slate-200 rounded-full appearance-none outline-none cursor-pointer"
+          onChange={(e) => setPriceRange(Number(e.target.value))}
+          className="custom-slider w-full"
         />
         <div className="flex justify-between text-xs text-slate-400 font-medium mt-3">
           <span>₹100</span>
@@ -179,8 +209,8 @@ const ProductListing = () => {
 
       {/* NOISE LEVEL */}
       <div>
-        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-800 tracking-[0.2em] uppercase mb-4">
-          <Flame size={14} className="text-orange-500" />
+        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-800 tracking-[0.2em] uppercase mb-3">
+          <Flame size={13} className="text-orange-500" />
           Intensity
         </h4>
         <div className="grid grid-cols-2 gap-2">
@@ -188,7 +218,7 @@ const ProductListing = () => {
             <button
               key={level}
               onClick={() => setNoise(level)}
-              className={`py-2.5 px-3 rounded-xl text-xs font-semibold text-center transition-all border ${
+              className={`py-2 px-2.5 rounded-lg text-xs font-semibold text-center transition-all border ${
                 noise === level
                   ? 'bg-orange-50 border-orange-200 text-orange-700 shadow-sm'
                   : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
@@ -201,7 +231,7 @@ const ProductListing = () => {
       </div>
 
       {/* GREEN TOGGLE */}
-      <label className="relative flex items-center justify-between p-4 rounded-2xl border border-slate-200 cursor-pointer group hover:border-emerald-300 hover:bg-emerald-50/30 transition-all overflow-hidden">
+      <label className="relative flex items-center justify-between p-3 rounded-xl border border-slate-200 cursor-pointer group hover:border-emerald-300 hover:bg-emerald-50/30 transition-all overflow-hidden">
         {greenOnly && (
           <div className="absolute inset-0 bg-emerald-500/5 animate-pulse"></div>
         )}
@@ -264,35 +294,35 @@ const ProductListing = () => {
   // MAIN RENDER
   // ----------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-[#F4F7F9] font-sans pb-24 text-slate-900">
+    <div className="min-h-screen bg-[#F4F7F9] font-sans pb-16 text-slate-900">
       {/* --- HERO BANNER --- */}
-      <div className="relative overflow-hidden bg-slate-900 pt-24 pb-28 px-6">
+      <div className="relative overflow-hidden bg-slate-900 pt-14 pb-18 px-6">
         {/* Abstract Glows */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/30 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen"></div>
+        <div className="absolute top-0 left-1/4 w-72 h-72 bg-blue-600/30 rounded-full blur-[80px] pointer-events-none mix-blend-screen"></div>
+        <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-emerald-500/20 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto relative z-10 flex flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-emerald-300 text-xs font-bold uppercase tracking-widest mb-6">
-            <Sparkles size={14} /> Premium Selection
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-emerald-300 text-[11px] font-bold uppercase tracking-widest mb-4">
+            <Sparkles size={12} /> Premium Selection
           </div>
-          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight mb-6 capitalize leading-tight">
+          <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-4 capitalize leading-tight">
             {activeCategory === 'All'
               ? 'Explore Our Fireworks'
               : `${activeCategory} Collection`}
           </h1>
-          <p className="text-slate-300 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
+          <p className="text-slate-300 text-base md:text-lg font-medium max-w-2xl leading-relaxed">
             Light up the sky with our hand-picked, high-quality fireworks.
             Factory fresh and ready to dazzle.
           </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 -mt-10 relative z-20">
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 -mt-8 relative z-20">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* --- DESKTOP FILTER --- */}
-          <aside className="hidden lg:block w-72 shrink-0">
-            <div className="bg-white/80 backdrop-blur-xl p-8 rounded-4xl border border-white shadow-xl shadow-slate-200/50 sticky top-32">
+          <aside className="hidden lg:block w-64 shrink-0">
+            <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-xl shadow-slate-200/50 sticky top-24">
               <FilterElements />
             </div>
           </aside>
@@ -300,7 +330,7 @@ const ProductListing = () => {
           {/* --- MAIN CONTENT --- */}
           <main className="flex-1">
             {/* TOOLBAR */}
-            <div className="bg-white/80 backdrop-blur-xl p-4 md:px-8 md:py-5 rounded-2xl border border-white shadow-lg shadow-slate-200/40 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="bg-white/80 backdrop-blur-xl p-3 md:px-6 md:py-3.5 rounded-xl border border-white shadow-lg shadow-slate-200/40 mb-6 flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-4 w-full sm:w-auto justify-between">
                 <button
                   onClick={() => setShowFilters(true)}
@@ -334,7 +364,7 @@ const ProductListing = () => {
 
             {/* PRODUCT GRID */}
             {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {filteredProducts.map((p) => {
                   const isAvailable = Number(p.stockQty) > 0 && !p.isOutOfStock;
                   const isHovered = hoveredProduct === p.id;
@@ -342,40 +372,40 @@ const ProductListing = () => {
                   return (
                     <div
                       key={p.id}
-                      className="group flex flex-col bg-white rounded-4xl border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-900/5 transition-all duration-500 overflow-hidden relative"
+                      className="group flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300 overflow-hidden relative"
                       onMouseEnter={() => setHoveredProduct(p.id)}
                       onMouseLeave={() => setHoveredProduct(null)}
                     >
                       {/* IMAGE CONTAINER */}
-                      <div className="relative aspect-4/5 overflow-hidden bg-slate-50 p-6 flex flex-col">
+                      <div className="relative aspect-square overflow-hidden bg-slate-50 p-3 flex flex-col">
                         {/* TOP BADGES */}
-                        <div className="absolute top-5 left-5 right-5 flex justify-between items-start z-10 pointer-events-none">
-                          <div className="flex flex-col gap-2">
+                        <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10 pointer-events-none">
+                          <div className="flex flex-col gap-1.5">
                             {p.isBestSeller && (
-                              <div className="bg-linear-to-r from-orange-500 to-rose-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/30">
+                              <div className="bg-linear-to-r from-orange-500 to-rose-500 text-white px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md shadow-orange-500/30">
                                 Best Seller
                               </div>
                             )}
                             {p.isGreen && (
-                              <div className="bg-emerald-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                                <Leaf size={14} />
+                              <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md shadow-emerald-500/30">
+                                <Leaf size={10} />
                               </div>
                             )}
                           </div>
-                          <button className="pointer-events-auto w-10 h-10 bg-white/80 backdrop-blur flex items-center justify-center rounded-full text-slate-400 hover:text-rose-500 hover:bg-white hover:scale-110 shadow-sm transition-all">
-                            <Heart size={18} />
+                          <button className="pointer-events-auto w-7 h-7 bg-white/80 backdrop-blur flex items-center justify-center rounded-full text-slate-400 hover:text-rose-500 hover:bg-white hover:scale-110 shadow-sm transition-all">
+                            <Heart size={13} />
                           </button>
                         </div>
 
                         <Link
                           to={`/product/${p.id}`}
                           onClick={() => window.scrollTo(0, 0)}
-                          className="block w-full h-full relative z-0 mt-4"
+                          className="block w-full h-full relative z-0 mt-2"
                         >
                           <img
                             src={p.images?.[0]}
                             alt={p.name}
-                            className="w-full h-full object-contain mix-blend-multiply transform transition-transform duration-700 group-hover:scale-110"
+                            className="w-full h-full object-contain mix-blend-multiply transform transition-transform duration-500 group-hover:scale-105"
                           />
                         </Link>
 
@@ -391,41 +421,41 @@ const ProductListing = () => {
                         {/* HOVER ADD TO CART (GLASSMORPHISM) */}
                         {isAvailable && (
                           <div
-                            className={`absolute bottom-5 left-5 right-5 z-20 transition-all duration-300 ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
+                            className={`absolute bottom-3 left-3 right-3 z-20 transition-all duration-300 ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'}`}
                           >
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
                                 addToCart(p);
                               }}
-                              className="w-full bg-slate-900/95 backdrop-blur-md text-white py-3.5 rounded-2xl text-xs font-bold tracking-widest uppercase hover:bg-emerald-500 transition-colors flex justify-center items-center gap-2 shadow-2xl shadow-slate-900/40"
+                              className="w-full bg-slate-900/95 backdrop-blur-md text-white py-2.5 rounded-xl text-[10px] font-bold tracking-widest uppercase hover:bg-emerald-500 transition-colors flex justify-center items-center gap-1.5 shadow-xl shadow-slate-900/40"
                             >
-                              <ShoppingCart size={16} /> Quick Add
+                              <ShoppingCart size={13} /> Quick Add
                             </button>
                           </div>
                         )}
                       </div>
 
                       {/* DETAILS CONTAINER */}
-                      <div className="flex flex-col flex-1 p-6 relative bg-white z-30">
-                        <div className="flex justify-between items-start mb-3 gap-2">
+                      <div className="flex flex-col flex-1 p-3 md:p-4 relative bg-white z-30">
+                        <div className="flex justify-between items-start mb-1.5 gap-1.5">
                           <Link
                             to={`/product/${p.id}`}
                             onClick={() => window.scrollTo(0, 0)}
-                            className="text-slate-900 font-black text-xl leading-tight hover:text-emerald-600 transition-colors line-clamp-2"
+                            className="text-slate-900 font-bold text-sm leading-snug hover:text-emerald-600 transition-colors line-clamp-2"
                           >
                             {p.name}
                           </Link>
-                          <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg shrink-0 border border-slate-100">
+                          <div className="flex items-center gap-0.5 bg-slate-50 px-1.5 py-0.5 rounded-md shrink-0 border border-slate-100">
                             <Flame
-                              size={12}
+                              size={10}
                               className={
                                 p.noiseLevel?.includes('High')
                                   ? 'text-rose-500'
                                   : 'text-orange-400'
                               }
                             />
-                            <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+                            <span className="text-[8px] font-bold text-slate-500 tracking-wider uppercase">
                               {p.noiseLevel === 'Low Noise'
                                 ? 'Low'
                                 : p.noiseLevel === 'High Noise'
@@ -435,20 +465,20 @@ const ProductListing = () => {
                           </div>
                         </div>
 
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
                           {p.category}
                         </div>
 
-                        <div className="mt-auto flex items-end justify-between pt-4 border-t border-slate-100">
+                        <div className="mt-auto flex items-end justify-between pt-2.5 border-t border-slate-100">
                           <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-400 line-through mb-1">
+                            <span className="text-[10px] font-bold text-slate-400 line-through mb-0.5">
                               ₹{p.mrpPrice}
                             </span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-xl font-black text-emerald-600">
+                            <div className="flex items-baseline gap-0.5">
+                              <span className="text-sm font-black text-emerald-600">
                                 ₹
                               </span>
-                              <span className="text-3xl font-black text-slate-900 tracking-tighter">
+                              <span className="text-lg font-black text-slate-900 tracking-tighter">
                                 {p.ourPrice}
                               </span>
                             </div>
@@ -458,13 +488,13 @@ const ProductListing = () => {
                           <button
                             disabled={!isAvailable}
                             onClick={() => addToCart(p)}
-                            className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all lg:hidden ${
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all lg:hidden ${
                               isAvailable
                                 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm'
                                 : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                             }`}
                           >
-                            <ShoppingCart size={20} />
+                            <ShoppingCart size={15} />
                           </button>
                         </div>
                       </div>
@@ -474,7 +504,7 @@ const ProductListing = () => {
               </div>
             ) : (
               /* EMPTY STATE */
-              <div className="bg-white/80 backdrop-blur-xl rounded-4xl border border-white shadow-xl shadow-slate-200/40 p-16 flex flex-col items-center text-center">
+              <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center text-center">
                 <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 border-8 border-white shadow-sm">
                   <Search size={32} className="text-slate-300" />
                 </div>
