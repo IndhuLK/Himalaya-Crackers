@@ -8,6 +8,7 @@ import {
   Loader2,
   Image as ImageIcon,
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 import {
   collection,
@@ -24,6 +25,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 
 export default function SliderManagement() {
+  const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [banners, setBanners] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -64,7 +66,7 @@ export default function SliderManagement() {
       setCurrentBanner((prev) => ({ ...prev, image: url }));
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload image.');
+      toast.error('Failed to upload image.');
     } finally {
       setUploading(false);
     }
@@ -73,7 +75,7 @@ export default function SliderManagement() {
   /* 💾 SAVE/UPDATE */
   const handleBannerSave = async () => {
     if (!currentBanner.image) {
-      alert('Please upload an image first!');
+      toast.warning('Please upload an image first!');
       return;
     }
 
@@ -101,7 +103,7 @@ export default function SliderManagement() {
       setCurrentBanner(emptyBanner);
     } catch (error) {
       console.error('Save error:', error);
-      alert('Error saving slider. Check Firebase permissions.');
+      toast.error('Error saving slider. Check Firebase permissions.');
     } finally {
       setIsSaving(false);
     }

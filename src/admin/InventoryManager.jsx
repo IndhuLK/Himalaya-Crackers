@@ -11,6 +11,7 @@ import {
   Search,
   CheckCircle2,
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 import { db } from '../config/firebase';
 import {
   collection,
@@ -23,6 +24,7 @@ import {
 } from 'firebase/firestore';
 
 export default function InventoryManager() {
+  const toast = useToast();
   const [products, setProducts] = useState([]); // from 'products' collection
   const [inventoryItems, setInventoryItems] = useState([]); // from 'inventory' collection
   const [categories, setCategories] = useState([]);
@@ -116,7 +118,7 @@ export default function InventoryManager() {
       });
     } catch (err) {
       console.error('Error adding inventory item:', err);
-      alert('Failed to add inventory item');
+      toast.error('Failed to add inventory item');
     }
   };
 
@@ -145,7 +147,7 @@ export default function InventoryManager() {
       await deleteDoc(doc(db, collectionName, id));
     } catch (err) {
       console.error('Delete error:', err);
-      alert('Failed to delete');
+      toast.error('Failed to delete');
     }
   };
 
@@ -304,7 +306,7 @@ export default function InventoryManager() {
 
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-blue-700 shadow-sm transition-colors flex items-center justify-center gap-2 h-[38px]"
+            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-blue-700 shadow-sm transition-colors flex items-center justify-center gap-2 h-9.5"
           >
             <Save size={16} /> Save Item
           </button>

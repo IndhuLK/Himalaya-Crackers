@@ -30,8 +30,10 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { useToast } from '../components/Toast';
 
 export default function OrderManagement() {
+  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -79,7 +81,7 @@ export default function OrderManagement() {
       await updateDoc(orderRef, { status: newStatus });
     } catch (err) {
       console.error('Update Error:', err);
-      alert('Failed to update status');
+      toast.error('Failed to update status');
     }
   };
 
@@ -89,7 +91,7 @@ export default function OrderManagement() {
     try {
       await deleteDoc(doc(db, 'orders', id));
     } catch (err) {
-      alert('Error deleting order');
+      toast.error('Error deleting order');
     }
   };
 

@@ -9,6 +9,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useToast } from '../components/Toast';
 
 // 1. Import Firebase tools
 import { db, storage } from '../config/firebase';
@@ -27,6 +28,7 @@ export default function AddProduct() {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   // 2. State for categories and loading
   const [categories, setCategories] = useState([]);
@@ -91,7 +93,7 @@ export default function AddProduct() {
   // 4. FIX: Save to Firestore (So ProductListing can see it)
   const handleSave = async () => {
     if (!formData.name || !formData.category || !formData.ourPrice) {
-      alert('Please fill Name, Category and Our Price');
+      toast.warning('Please fill Name, Category and Our Price');
       return;
     }
 
@@ -109,20 +111,20 @@ export default function AddProduct() {
       if (formData.id) {
         // Update existing product
         await updateDoc(doc(db, 'products', formData.id), productData);
-        alert('Product Updated!');
+        toast.success('Product Updated!');
       } else {
         // Add new product
         await addDoc(collection(db, 'products'), {
           ...productData,
           createdAt: serverTimestamp(),
         });
-        alert('Product Added Successfully!');
+        toast.success('Product Added Successfully!');
       }
 
       navigate('/admin/products');
     } catch (error) {
       console.error(error);
-      alert('Error saving to Database');
+      toast.error('Error saving to Database');
     } finally {
       setIsSaving(false);
     }
@@ -149,7 +151,7 @@ export default function AddProduct() {
         setNewCatName('');
       } catch (err) {
         console.error('Error adding category', err);
-        alert('Failed to add category');
+        toast.error('Failed to add category');
       }
     }
   };
