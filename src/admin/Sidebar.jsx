@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  BookOpenText,
   ShoppingBag,
   Package,
   Images,
@@ -9,7 +10,6 @@ import {
   ChevronDown,
   LogOut,
   BarChart,
-  Settings,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -63,7 +63,7 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
   };
 
   const sidebarClasses = `
-    bg-[#1e222d] text-gray-300 z-40 transition-all duration-300 flex flex-col shrink-0
+    bg-[#1f2937] text-slate-300 z-40 transition-all duration-300 flex flex-col shrink-0 border-r border-slate-700/60
     ${isMobile ? 'fixed top-0 left-0 h-screen shadow-2xl' : 'sticky top-0 h-screen'}
     ${isOpen ? 'translate-x-0 w-64' : `${isMobile ? '-translate-x-full w-64' : 'w-16'} xl:translate-x-0`}
   `;
@@ -78,24 +78,23 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
       )}
 
       <aside className={sidebarClasses}>
-        {/* Brand Header */}
-        <div className="h-16 flex items-center px-4 border-b border-gray-700/50 shrink-0">
-          <div className="w-8 h-8 rounded shrink-0 bg-blue-600 flex items-center justify-center font-bold text-white text-lg">
-            H
+        <div className="flex h-15 items-center border-b border-slate-700/60 px-4 shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0f6fff] text-white shrink-0">
+            <BookOpenText size={16} />
           </div>
           {isOpen && (
             <div className="ml-3 truncate">
-              <h2 className="font-semibold text-white tracking-wide text-sm">
+              <h2 className="text-sm font-semibold tracking-wide text-white">
                 Himalaya Books
               </h2>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                Enterprise Ed.
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                Sales Suite
               </p>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 py-4 space-y-1 overflow-y-auto overflow-x-hidden customs-scrollbar">
+        <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 py-4 customs-scrollbar">
           {menus.map((item, index) => {
             const isSubmenu = item.isSubmenu;
             const isActive = location.pathname === item.path;
@@ -106,8 +105,8 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
 
             const activeClass =
               isActive || isChildActive
-                ? 'bg-[#2b303b] text-white border-l-4 border-blue-500'
-                : 'border-l-4 border-transparent hover:bg-[#2b303b]/50 hover:text-gray-100';
+                ? 'bg-slate-800 text-white border border-slate-700 shadow-[inset_3px_0_0_0_#0f6fff]'
+                : 'border border-transparent hover:bg-slate-800/70 hover:text-slate-100';
 
             if (isSubmenu) {
               return (
@@ -116,13 +115,13 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
                     onClick={() =>
                       !isOpen ? setIsOpen(true) : toggleSubmenu(item.name)
                     }
-                    className={`nav-item flex items-center justify-between px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
+                    className={`nav-item flex items-center justify-between rounded-md px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
                     title={!isOpen ? item.name : ''}
                   >
                     <div className="flex items-center gap-3">
                       <span
                         className={
-                          isChildActive ? 'text-blue-400' : 'text-gray-400'
+                          isChildActive ? 'text-[#58a6ff]' : 'text-slate-400'
                         }
                       >
                         {item.icon}
@@ -134,17 +133,17 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
                     {isOpen && (
                       <ChevronDown
                         size={14}
-                        className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       />
                     )}
                   </button>
                   {isOpen && isExpanded && (
-                    <div className="bg-[#181a24] py-1">
+                    <div className="ml-3 border-l border-slate-700/70 py-1">
                       {item.subItems.map((sub) => (
                         <Link
                           key={sub.path}
                           to={sub.path}
-                          className={`block py-2 pl-12 pr-4 text-sm transition-colors ${location.pathname === sub.path ? 'text-blue-400 font-medium' : 'text-gray-400 hover:text-gray-200'}`}
+                          className={`block py-2 pl-6 pr-4 text-sm transition-colors ${location.pathname === sub.path ? 'font-medium text-[#58a6ff]' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                           {sub.name}
                         </Link>
@@ -160,9 +159,11 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
                 key={index}
                 to={item.path}
                 title={!isOpen ? item.name : ''}
-                className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
+                className={`flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors ${activeClass} ${!isOpen ? 'justify-center' : ''}`}
               >
-                <span className={isActive ? 'text-blue-400' : 'text-gray-400'}>
+                <span
+                  className={isActive ? 'text-[#58a6ff]' : 'text-slate-400'}
+                >
                   {item.icon}
                 </span>
                 {isOpen && (
@@ -173,11 +174,11 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
           })}
         </nav>
 
-        <div className="p-3 border-t border-gray-700/50 shrink-0">
+        <div className="border-t border-slate-700/60 p-3 shrink-0">
           <button
             onClick={handleLogout}
             title={!isOpen ? 'Sign Out' : ''}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors text-sm font-medium ${!isOpen ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-red-400/10 hover:text-red-300 ${!isOpen ? 'justify-center' : ''}`}
           >
             <LogOut size={18} />
             {isOpen && <span>Sign Out</span>}
