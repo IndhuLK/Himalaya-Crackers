@@ -72,6 +72,12 @@ const statusThemes = {
 const formatCurrency = (value) =>
   `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
+const formatDocumentCurrency = (value) =>
+  `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+
+const formatOrderNumber = (value) =>
+  `SO-${String(value || 0).padStart(4, '0')}`;
+
 const formatDate = (value) => {
   if (!value) return 'Not available';
 
@@ -102,13 +108,6 @@ const getCustomerInfo = (order) => {
     address: address || 'Address not available',
   };
 };
-
-const getOrderNumber = (order) =>
-  `SO-${
-    String(order.id || '')
-      .slice(-6)
-      .toUpperCase() || '000000'
-  }`;
 
 const getOrderItems = (order) =>
   (order.items || []).map((item) => ({
@@ -199,6 +198,11 @@ export default function OrderManagement() {
       sum + getOrderItems(order).reduce((qtySum, item) => qtySum + item.qty, 0),
     0
   );
+  const orderNumbers = Object.fromEntries(
+    orders.map((order, index) => [order.id, formatOrderNumber(index + 1)])
+  );
+  const getOrderNumber = (order) =>
+    orderNumbers[order.id] || formatOrderNumber();
   const activeOrder =
     filteredOrders.find((order) => order.id === selectedOrder?.id) ||
     filteredOrders[0] ||
@@ -301,11 +305,11 @@ export default function OrderManagement() {
     pdf.text('Amount', 112, 72);
 
     pdf.setTextColor(...dark);
-    pdf.text(formatDate(order.createdAt), 153, 54, { align: 'left' });
+    pdf.text(formatDate(order.createdAt), 192, 54, { align: 'right' });
     pdf.setTextColor(...accent);
-    pdf.text(order.status || 'Pending', 153, 63, { align: 'left' });
+    pdf.text(order.status || 'Pending', 192, 63, { align: 'right' });
     pdf.setTextColor(...dark);
-    pdf.text(formatCurrency(total), 153, 72, { align: 'left' });
+    pdf.text(formatDocumentCurrency(total), 192, 72, { align: 'right' });
 
     autoTable(pdf, {
       startY: 88,
@@ -313,8 +317,8 @@ export default function OrderManagement() {
       body: items.map((item) => [
         item.name || 'Unnamed item',
         item.qty,
-        formatCurrency(item.price),
-        formatCurrency(item.total),
+        formatDocumentCurrency(item.price),
+        formatDocumentCurrency(item.total),
       ]),
       theme: 'grid',
       styles: {
@@ -333,9 +337,10 @@ export default function OrderManagement() {
         fillColor: [255, 255, 255],
       },
       columnStyles: {
-        1: { halign: 'center', cellWidth: 20 },
-        2: { halign: 'right', cellWidth: 30 },
-        3: { halign: 'right', cellWidth: 34 },
+        0: { cellWidth: 106 },
+        1: { halign: 'center', cellWidth: 18 },
+        2: { halign: 'right', cellWidth: 32 },
+        3: { halign: 'right', cellWidth: 36 },
       },
     });
 
@@ -347,14 +352,18 @@ export default function OrderManagement() {
     pdf.text('Subtotal', 132, finalY + 20);
     pdf.text('Shipping', 132, finalY + 28);
     pdf.setTextColor(...dark);
-    pdf.text(formatCurrency(total), 190, finalY + 20, { align: 'right' });
+    pdf.text(formatDocumentCurrency(total), 190, finalY + 20, {
+      align: 'right',
+    });
     pdf.text('Included', 190, finalY + 28, { align: 'right' });
 
     pdf.setFillColor(...light);
     pdf.roundedRect(126, finalY + 44, 70, 18, 4, 4, 'F');
     pdf.setFont('helvetica', 'bold');
     pdf.text('Grand Total', 132, finalY + 55);
-    pdf.text(formatCurrency(total), 190, finalY + 55, { align: 'right' });
+    pdf.text(formatDocumentCurrency(total), 190, finalY + 55, {
+      align: 'right',
+    });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(...slate);
@@ -390,8 +399,8 @@ export default function OrderManagement() {
           <tr>
             <td>${item.name || 'Unnamed item'}</td>
             <td style="text-align:center;">${item.qty}</td>
-            <td style="text-align:right;">${formatCurrency(item.price)}</td>
-            <td style="text-align:right;">${formatCurrency(item.total)}</td>
+            <td style="text-align:right;">${formatDocumentCurrency(item.price)}</td>
+            <td style="text-align:right;">${formatDocumentCurrency(item.total)}</td>
           </tr>
         `
       )
@@ -551,7 +560,7 @@ export default function OrderManagement() {
                 <div class="card">
                   <div class="label">Order Details</div>
                   <div class="muted" style="margin-bottom:10px;">Date: ${formatDate(order.createdAt)}</div>
-                  <div class="muted" style="margin-bottom:10px;">Amount: ${formatCurrency(total)}</div>
+                  <div class="muted" style="margin-bottom:10px;">Amount: ${formatDocumentCurrency(total)}</div>
                   <span class="status" style="${statusInlineStyle}">${order.status || 'Pending'}</span>
                 </div>
               </div>
@@ -569,9 +578,9 @@ export default function OrderManagement() {
                 </tbody>
               </table>
               <div class="totals">
-                <div class="totals-row"><span>Subtotal</span><strong>${formatCurrency(total)}</strong></div>
+                <div class="totals-row"><span>Subtotal</span><strong>${formatDocumentCurrency(total)}</strong></div>
                 <div class="totals-row"><span>Shipping</span><strong>Included</strong></div>
-                <div class="grand-total"><span>Grand Total</span><span>${formatCurrency(total)}</span></div>
+                <div class="grand-total"><span>Grand Total</span><span>${formatDocumentCurrency(total)}</span></div>
               </div>
             </div>
           </div>
