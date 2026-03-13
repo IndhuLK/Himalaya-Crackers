@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
 import {
   Search,
   Loader2,
@@ -129,78 +131,38 @@ const ProductListing = () => {
           <h4 className="text-xs font-bold text-slate-800 tracking-[0.2em] uppercase">
             Max Price
           </h4>
+
           <span className="text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md">
             ₹{priceRange}
           </span>
         </div>
-        <style>{`
-          .custom-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 6px;
-            border-radius: 999px;
-            outline: none;
-            cursor: pointer;
-            background: linear-gradient(
-              to right,
-              #10b981 0%,
-              #10b981 ${((priceRange - 100) / (20000 - 100)) * 100}%,
-              #e2e8f0 ${((priceRange - 100) / (20000 - 100)) * 100}%,
-              #e2e8f0 100%
-            );
-            transition: background 0.05s ease;
-          }
-          .custom-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border: 3px solid #10b981;
-            border-radius: 50%;
-            cursor: grab;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            transition: box-shadow 0.15s, transform 0.15s;
-          }
-          .custom-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
-            box-shadow: 0 0 0 6px rgba(16,185,129,0.15);
-          }
-          .custom-slider::-webkit-slider-thumb:active {
-            cursor: grabbing;
-            transform: scale(1.2);
-            box-shadow: 0 0 0 8px rgba(16,185,129,0.2);
-          }
-          .custom-slider::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            background: #fff;
-            border: 3px solid #10b981;
-            border-radius: 50%;
-            cursor: grab;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            transition: box-shadow 0.15s, transform 0.15s;
-          }
-          .custom-slider::-moz-range-thumb:hover {
-            transform: scale(1.15);
-            box-shadow: 0 0 0 6px rgba(16,185,129,0.15);
-          }
-          .custom-slider::-moz-range-track {
-            height: 6px;
-            border-radius: 999px;
-            background: transparent;
-          }
-        `}</style>
-        <input
-          type="range"
-          min="100"
-          max="20000"
-          step="1"
-          value={priceRange}
-          onChange={(e) => setPriceRange(Number(e.target.value))}
-          className="custom-slider w-full"
-        />
+
+        <div className="px-2">
+          <Slider
+            min={100}
+            max={20000}
+            step={10000}
+            value={priceRange}
+            onChange={(value) => setPriceRange(value)}
+            trackStyle={{
+              backgroundColor: '#10b981',
+              height: 6,
+            }}
+            handleStyle={{
+              borderColor: '#10b981',
+              height: 18,
+              width: 18,
+              marginTop: -6,
+              backgroundColor: '#fff',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            }}
+            railStyle={{
+              backgroundColor: '#e2e8f0',
+              height: 6,
+            }}
+          />
+        </div>
+
         <div className="flex justify-between text-xs text-slate-400 font-medium mt-3">
           <span>₹100</span>
           <span>₹20000</span>
