@@ -10,22 +10,26 @@ import {
   MapPin,
   PackageSearch,
   Phone,
+  Plus,
   Printer,
   Search,
   ShoppingBag,
   Square,
   Trash2,
   Truck,
+  X,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
 
@@ -134,6 +138,20 @@ export default function OrderManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedOrders, setSelectedOrders] = useState([]);
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const productList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAvailableProducts(productList);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const ordersQuery = query(
@@ -253,6 +271,59 @@ export default function OrderManagement() {
     setSelectedOrders((prev) => [
       ...new Set([...prev, ...filteredOrders.map((order) => order.id)]),
     ]);
+  };
+
+  const handleExportCSV = () => {
+    if (orders.length === 0) {
+      toast.warning('No data to export');
+      return;
+    }
+
+    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Email', 'Status', 'Total Amount', 'Items'];
+    const csvData = orders.map((order, index) => {
+      const customer = getCustomerInfo(order);
+      const items = getOrderItems(order).map(item => `${item.name}(${item.qty})`).join('; ');
+      return [
+        formatOrderNumber(orders.length - index),
+        formatDate(order.createdAt),
+        customer.name,
+        customer.phone,
+        customer.email,
+        order.status || 'Pending',
+        getOrderTotal(order),
+        `"${items}"`
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...csvData].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sales_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Orders exported to CSV');
+  };
+
+  const handleSaveOrder = async (orderData) => {
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'orders'), {
+        ...orderData,
+        createdAt: serverTimestamp(),
+        status: 'Pending',
+      });
+      setShowNewOrderModal(false);
+      toast.success('Sales Order Created Successfully!');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save order');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const generateInvoicePDF = (order) => {
@@ -609,6 +680,14 @@ export default function OrderManagement() {
 
   return (
     <div className="space-y-4">
+      {showNewOrderModal && (
+        <NewOrderModal
+          onClose={() => setShowNewOrderModal(false)}
+          onSave={handleSaveOrder}
+          products={availableProducts}
+          isSaving={isSaving}
+        />
+      )}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -626,10 +705,16 @@ export default function OrderManagement() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
+          <button 
+            onClick={handleExportCSV}
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          >
             Export
           </button>
-          <button className="rounded-md bg-[#0f6fff] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#0c5dd4]">
+          <button 
+            onClick={() => setShowNewOrderModal(true)}
+            className="rounded-md bg-[#0f6fff] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#0c5dd4]"
+          >
             New Sales Order
           </button>
         </div>
@@ -1132,6 +1217,199 @@ export default function OrderManagement() {
           </aside>
         </div>
       </section>
+    </div>
+  );
+}
+
+function NewOrderModal({ onClose, onSave, products, isSaving }) {
+  const [customer, setCustomer] = useState({ name: '', mobile: '', email: '', address: '' });
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [searchProduct, setSearchProduct] = useState('');
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchProduct.toLowerCase())
+  );
+
+  const addItem = (product) => {
+    const existing = selectedItems.find(item => item.id === product.id);
+    if (existing) {
+      setSelectedItems(selectedItems.map(item => 
+        item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+      ));
+    } else {
+      setSelectedItems([...selectedItems, {
+        id: product.id,
+        name: product.name,
+        price: product.ourPrice,
+        qty: 1
+      }]);
+    }
+  };
+
+  const removeItem = (id) => {
+    setSelectedItems(selectedItems.filter(item => item.id !== id));
+  };
+
+  const updateQty = (id, newQty) => {
+    if (newQty < 1) return;
+    setSelectedItems(selectedItems.map(item => 
+      item.id === id ? { ...item, qty: newQty } : item
+    ));
+  };
+
+  const total = selectedItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+  const handleSave = () => {
+    if (!customer.name) return alert('Customer name is required');
+    if (selectedItems.length === 0) return alert('Add at least one item');
+    onSave({
+      customer,
+      items: selectedItems,
+      total,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <h2 className="text-xl font-bold text-slate-900">Create New Sales Order</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+            <X size={20} className="text-slate-500" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Customer Details</h3>
+              <div className="grid gap-4">
+                <input
+                  type="text"
+                  placeholder="Customer Name"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={customer.name}
+                  onChange={e => setCustomer({...customer, name: e.target.value})}
+                />
+                <input
+                  type="text"
+                  placeholder="Mobile Number"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={customer.mobile}
+                  onChange={e => setCustomer({...customer, mobile: e.target.value})}
+                />
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={customer.email}
+                  onChange={e => setCustomer({...customer, email: e.target.value})}
+                />
+                <textarea
+                  placeholder="Full Address"
+                  rows="2"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={customer.address}
+                  onChange={e => setCustomer({...customer, address: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Add Products</h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={searchProduct}
+                  onChange={e => setSearchProduct(e.target.value)}
+                />
+              </div>
+              <div className="border border-slate-100 rounded-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {filteredProducts.map(product => (
+                  <div key={product.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{product.name}</p>
+                      <p className="text-xs text-slate-500">₹{product.ourPrice}</p>
+                    </div>
+                    <button onClick={() => addItem(product)} className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100">
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Selected Items</h3>
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Product</th>
+                    <th className="px-4 py-3 text-center">Qty</th>
+                    <th className="px-4 py-3 text-right">Price</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedItems.map(item => (
+                    <tr key={item.id} className="bg-white">
+                      <td className="px-4 py-3 font-medium text-slate-900">{item.name}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">-</button>
+                          <span className="w-8 text-center">{item.qty}</span>
+                          <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">+</button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-600">₹{item.price}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900">₹{item.price * item.qty}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600">
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {selectedItems.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="px-4 py-8 text-center text-slate-400">No items added yet</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Grand Total</p>
+            <p className="text-2xl font-bold text-slate-900">₹{total.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-slate-200 bg-white text-slate-700 rounded-md font-semibold hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-200 disabled:bg-blue-400"
+            >
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'Save Order'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

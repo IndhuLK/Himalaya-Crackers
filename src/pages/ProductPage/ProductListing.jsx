@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import Slider from 'rc-slider';
-import 'rc-slider/assets/index.css';
 import {
   Search,
   Loader2,
@@ -124,7 +122,6 @@ const ProductListing = () => {
           ))}
         </div>
       </div>
-
       {/* PRICE RANGE */}
       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div className="flex justify-between items-end mb-3">
@@ -137,38 +134,21 @@ const ProductListing = () => {
           </span>
         </div>
 
-        <div className="px-2">
-          <Slider
-            min={100}
-            max={20000}
-            step={10000}
-            value={priceRange}
-            onChange={(value) => setPriceRange(value)}
-            trackStyle={{
-              backgroundColor: '#10b981',
-              height: 6,
-            }}
-            handleStyle={{
-              borderColor: '#10b981',
-              height: 18,
-              width: 18,
-              marginTop: -6,
-              backgroundColor: '#fff',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-            }}
-            railStyle={{
-              backgroundColor: '#e2e8f0',
-              height: 6,
-            }}
-          />
-        </div>
+        <input
+          type="range"
+          min="100"
+          max="20000"
+          step="100"
+          value={priceRange}
+          onChange={(e) => setPriceRange(Number(e.target.value))}
+          className="w-full accent-emerald-500 cursor-pointer"
+        />
 
         <div className="flex justify-between text-xs text-slate-400 font-medium mt-3">
           <span>₹100</span>
           <span>₹20000</span>
         </div>
       </div>
-
       {/* NOISE LEVEL */}
       <div>
         <h4 className="flex items-center gap-2 text-xs font-bold text-slate-800 tracking-[0.2em] uppercase mb-3">
