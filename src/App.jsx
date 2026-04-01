@@ -23,7 +23,10 @@ import { InventoryProvider } from './admin/InventoryContext';
 import InventoryManager from './admin/InventoryManager';
 import { InProvider } from './admin/InContext';
 import OrderManagement from './admin/OrderManagement';
+import OrderDetails from './admin/OrderDetails';
+import InvoiceManagement from './admin/InvoiceManagement';
 import SliderManagement from './admin/SliderManagement';
+import CategoryManagement from './admin/CategoryManagement';
 import { CartProvider } from './Context/CartContext';
 import AboutUs from './pages/AboutPage/AboutUs';
 import SafetyGuidelines from './components/SafetyGuidelines';
@@ -33,6 +36,7 @@ import FAQ from './components/FAQ';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsAndConditions from './components/Terms';
 import RefundPolicy from './components/RefundPolicy';
+import ScrollToTop from './components/ScrollToTop';
 
 function App() {
   return (
@@ -44,6 +48,7 @@ function App() {
               <OrderProvider>
                 <InProvider>
                   <BrowserRouter>
+                    <ScrollToTop />
                     <CartProvider>
                       <Routes>
                         <Route element={<PublicLayout />}>
@@ -52,7 +57,7 @@ function App() {
                           <Route path="/contact" element={<Contact />} />
                           <Route path="/products" element={<Product />} />
                           <Route
-                            path="/product/:id"
+                            path="/product/:slug"
                             element={<ProductDetails />}
                           />
                           <Route
@@ -99,8 +104,20 @@ function App() {
                             element={<OrderManagement />}
                           />
                           <Route
+                            path="/admin/orders/:orderId"
+                            element={<OrderDetails />}
+                          />
+                          <Route
+                            path="/admin/invoices"
+                            element={<InvoiceManagement />}
+                          />
+                          <Route
                             path="/admin/slider-management"
                             element={<SliderManagement />}
+                          />
+                          <Route
+                            path="/admin/categories"
+                            element={<CategoryManagement />}
                           />
                         </Route>
                       </Routes>

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
-  Bell,
   ChevronRight,
-  CircleHelp,
   Command,
   Globe,
   LogOut,
@@ -12,6 +10,7 @@ import {
   Search,
   Settings,
   UserCircle,
+  X,
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
@@ -103,36 +102,9 @@ export default function AdminLayout() {
               <ChevronRight size={12} className="text-slate-300" />
               <span className="text-slate-800">Sales</span>
             </div>
-
-            <div className="hidden max-w-xl flex-1 md:flex">
-              <div className="flex w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-blue-500 focus-within:bg-white">
-                <Search size={15} className="text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search customers, items, invoices..."
-                  className="ml-2 w-full border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                />
-                <span className="hidden items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:inline-flex">
-                  <Command size={10} />K
-                </span>
-              </div>
-            </div>
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            <button className="hidden rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 lg:inline-flex">
-              New Order
-            </button>
-
-            <button className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100">
-              <CircleHelp size={18} />
-            </button>
-
-            <button className="relative rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100">
-              <Bell size={18} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500"></span>
-            </button>
-
             <div className="h-6 w-px bg-slate-200"></div>
 
             <div className="relative" ref={profileRef}>

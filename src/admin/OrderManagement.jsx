@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
+  ExternalLink,
   CalendarDays,
   CheckSquare,
   CircleDollarSign,
   Download,
   FileText,
   Loader2,
-  Mail,
-  MapPin,
   PackageSearch,
-  Phone,
   Plus,
   Printer,
   Search,
   ShoppingBag,
   Square,
+  TrendingUp,
   Trash2,
   Truck,
-  X,
+  Percent,
+  AlertCircle,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -26,12 +26,15 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { db } from '../config/firebase';
 import { useToast } from '../components/Toast';
@@ -78,6 +81,27 @@ const formatCurrency = (value) =>
 
 const formatDocumentCurrency = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+
+const generateRandomSuffix = () => {
+  // Generate 4-digit random number (0000-9999)
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+};
+
+const generateOrderNumber = () => {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2); // 26 for 2026
+  const month = String(now.getMonth() + 1).padStart(2, '0'); // 01-12
+  const random = generateRandomSuffix(); // 4-digit random number
+  return `ORD-${year}${month}-${random}`;
+};
+
+const generateInvoiceNumber = () => {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const random = generateRandomSuffix();
+  return `INV-${year}${month}-${random}`;
+};
 
 const formatOrderNumber = (value) =>
   `SO-${String(value || 0).padStart(4, '0')}`;
@@ -129,8 +153,43 @@ const getOrderTotal = (order) => {
   return Number(order.total || computedTotal || 0);
 };
 
+const migrateOrdersToNewFormat = async () => {
+  try {
+    const existingOrdersRef = collection(db, 'orders');
+    const snapshot = await getDocs(existingOrdersRef);
+
+    let updated = 0;
+    const updates = [];
+
+    snapshot.forEach((docSnapshot) => {
+      const order = docSnapshot.data();
+      // Only update if doesn't have new format order number
+      if (!order.orderNumber || order.orderNumber.startsWith('SO-')) {
+        const newOrderNumber = generateOrderNumber();
+        updates.push(
+          updateDoc(doc(db, 'orders', docSnapshot.id), {
+            orderNumber: newOrderNumber,
+          })
+        );
+        updated++;
+      }
+    });
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`Migrated ${updated} orders to new format`);
+      return updated;
+    }
+    return 0;
+  } catch (error) {
+    console.error('Migration error:', error);
+    throw error;
+  }
+};
+
 export default function OrderManagement() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,12 +200,38 @@ export default function OrderManagement() {
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [availableProducts, setAvailableProducts] = useState([]);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const linkedOrderId = searchParams.get('orderId');
+
+  const handleMigrateOrders = async () => {
+    if (
+      !window.confirm(
+        'Migrate all existing orders to new ORD-26MM-[RAND] format?'
+      )
+    )
+      return;
+
+    setIsMigrating(true);
+    try {
+      const count = await migrateOrdersToNewFormat();
+      if (count > 0) {
+        toast.success(`Updated ${count} orders to new format`);
+      } else {
+        toast.info('All orders already using new format');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Migration failed');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const productList = snapshot.docs.map(doc => ({
+      const productList = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
       setAvailableProducts(productList);
     });
@@ -216,11 +301,93 @@ export default function OrderManagement() {
       sum + getOrderItems(order).reduce((qtySum, item) => qtySum + item.qty, 0),
     0
   );
-  const orderNumbers = Object.fromEntries(
-    orders.map((order, index) => [order.id, formatOrderNumber(index + 1)])
-  );
-  const getOrderNumber = (order) =>
-    orderNumbers[order.id] || formatOrderNumber();
+  const getOrderNumber = (order) => {
+    if (order.orderNumber) return order.orderNumber;
+
+    // Fallback: Generate consistent format based on order ID
+    let createdDate = new Date();
+    if (order.createdAt) {
+      createdDate = order.createdAt?.toDate
+        ? order.createdAt.toDate()
+        : new Date(order.createdAt);
+    }
+
+    const year = String(createdDate.getFullYear()).slice(-2);
+    const month = String(createdDate.getMonth() + 1).padStart(2, '0');
+
+    // Generate consistent 4-digit suffix from order ID hash
+    let hash = 0;
+    for (let i = 0; i < order.id?.length; i++) {
+      hash = (hash << 5) - hash + order.id.charCodeAt(i);
+      hash |= 0;
+    }
+    const suffix = String(Math.abs(hash) % 10000).padStart(4, '0');
+    return `ORD-${year}${month}-${suffix}`;
+  };
+
+  const createInvoiceRecord = async (order, source = 'pdf') => {
+    const customer = getCustomerInfo(order);
+    const total = getOrderTotal(order);
+
+    if (order.invoiceGenerated && order.invoiceNumber) {
+      return { invoiceNumber: order.invoiceNumber, isExisting: true };
+    }
+
+    if (order.id) {
+      const existingInvoiceSnapshot = await getDocs(
+        query(collection(db, 'invoices'), where('orderId', '==', order.id))
+      );
+
+      if (!existingInvoiceSnapshot.empty) {
+        const existingInvoiceDoc = existingInvoiceSnapshot.docs[0];
+        const existingInvoiceData = existingInvoiceDoc.data();
+        const existingInvoiceNumber =
+          existingInvoiceData.invoiceNumber || order.invoiceNumber;
+
+        await updateDoc(doc(db, 'orders', order.id), {
+          invoiceGenerated: true,
+          invoiceNumber: existingInvoiceNumber,
+          invoiceId: existingInvoiceDoc.id,
+        });
+
+        return { invoiceNumber: existingInvoiceNumber, isExisting: true };
+      }
+    }
+
+    const invoiceNumber = order.invoiceNumber || generateInvoiceNumber();
+    const invoiceRef = await addDoc(collection(db, 'invoices'), {
+      invoiceNumber,
+      orderId: order.id || null,
+      orderNumber: getOrderNumber(order),
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      total,
+      status: order.status || 'Pending',
+      source,
+      createdAt: serverTimestamp(),
+    });
+
+    if (order.id) {
+      await updateDoc(doc(db, 'orders', order.id), {
+        invoiceGenerated: true,
+        invoiceNumber,
+        invoiceId: invoiceRef.id,
+      });
+    }
+
+    return { invoiceNumber, isExisting: false };
+  };
+
+  useEffect(() => {
+    if (!linkedOrderId || orders.length === 0) return;
+
+    const linkedOrder = orders.find((order) => order.id === linkedOrderId);
+    if (linkedOrder) {
+      setFilter('All');
+      setSearchTerm('');
+      setSelectedOrder(linkedOrder);
+    }
+  }, [linkedOrderId, orders]);
   const activeOrder =
     filteredOrders.find((order) => order.id === selectedOrder?.id) ||
     filteredOrders[0] ||
@@ -279,19 +446,30 @@ export default function OrderManagement() {
       return;
     }
 
-    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Email', 'Status', 'Total Amount', 'Items'];
-    const csvData = orders.map((order, index) => {
+    const headers = [
+      'Order Number',
+      'Date',
+      'Customer Name',
+      'Phone',
+      'Email',
+      'Status',
+      'Total Amount',
+      'Items',
+    ];
+    const csvData = orders.map((order) => {
       const customer = getCustomerInfo(order);
-      const items = getOrderItems(order).map(item => `${item.name}(${item.qty})`).join('; ');
+      const items = getOrderItems(order)
+        .map((item) => `${item.name}(${item.qty})`)
+        .join('; ');
       return [
-        formatOrderNumber(orders.length - index),
+        getOrderNumber(order),
         formatDate(order.createdAt),
         customer.name,
         customer.phone,
         customer.email,
         order.status || 'Pending',
         getOrderTotal(order),
-        `"${items}"`
+        `"${items}"`,
       ].join(',');
     });
 
@@ -300,7 +478,10 @@ export default function OrderManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `sales_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `sales_orders_${new Date().toISOString().split('T')[0]}.csv`
+    );
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -311,8 +492,11 @@ export default function OrderManagement() {
   const handleSaveOrder = async (orderData) => {
     setIsSaving(true);
     try {
+      const newOrderNumber = generateOrderNumber();
+
       await addDoc(collection(db, 'orders'), {
         ...orderData,
+        orderNumber: newOrderNumber,
         createdAt: serverTimestamp(),
         status: 'Pending',
       });
@@ -326,152 +510,243 @@ export default function OrderManagement() {
     }
   };
 
-  const generateInvoicePDF = (order) => {
+  const generateInvoicePDF = async (order) => {
     const customer = getCustomerInfo(order);
     const items = getOrderItems(order);
     const total = getOrderTotal(order);
-    const pdf = new jsPDF();
-    const dark = [17, 24, 39];
-    const slate = [100, 116, 139];
-    const light = [248, 250, 252];
-    const border = [226, 232, 240];
-    const accent = statusThemes[order.status]?.accent || [37, 99, 235];
+    let invoiceNumber = generateInvoiceNumber();
 
-    pdf.setFillColor(...dark);
-    pdf.rect(0, 0, 210, 30, 'F');
+    try {
+      const invoiceResult = await createInvoiceRecord(order, 'pdf');
+      invoiceNumber = invoiceResult.invoiceNumber;
+      if (invoiceResult.isExisting) {
+        toast.info(
+          'Invoice already exists for this order. Reusing same number.'
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      toast.warning('Invoice generated, but failed to save in invoice tab');
+    }
 
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    // Professional Colors
+    const darkGray = [31, 41, 55];
+    const lightGray = [156, 163, 175];
+    const borderGray = [209, 213, 219];
+    const white = [255, 255, 255];
+    const text = [17, 24, 39];
+
+    // TOP BORDER - Professional accent line
+    pdf.setDrawColor(31, 41, 55);
+    pdf.setLineWidth(2);
+    pdf.line(0, 8, 210, 8);
+
+    // HEADER - Company Info
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(22);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('Himalaya Crackers', 14, 19);
-
-    pdf.setFontSize(9);
-    pdf.text('Sales Order', 196, 12, { align: 'right' });
-    pdf.setFontSize(14);
-    pdf.text(getOrderNumber(order), 196, 20, { align: 'right' });
-
-    pdf.setDrawColor(...border);
-    pdf.roundedRect(14, 38, 88, 38, 4, 4);
-    pdf.roundedRect(108, 38, 88, 38, 4, 4);
-
-    pdf.setTextColor(...slate);
-    pdf.setFontSize(9);
-    pdf.text('Customer', 18, 46);
-    pdf.text('Order Details', 112, 46);
-
-    pdf.setTextColor(...dark);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.text(customer.name, 18, 54);
+    pdf.setFontSize(18);
+    pdf.setTextColor(...text);
+    pdf.text('HIMALAYA CRACKERS', 14, 20);
 
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9.5);
-    pdf.setTextColor(...slate);
-    pdf.text(pdf.splitTextToSize(customer.address, 76), 18, 61);
-    pdf.text(customer.phone, 18, 72);
-    pdf.text(customer.email, 18, 77);
+    pdf.setFontSize(8);
+    pdf.setTextColor(...lightGray);
+    pdf.text('Premium Quality Crackers & Fireworks', 14, 25);
 
-    pdf.text('Order Date', 112, 54);
-    pdf.text('Status', 112, 63);
-    pdf.text('Amount', 112, 72);
+    // INVOICE TITLE
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(...text);
+    pdf.text('INVOICE', 180, 20, { align: 'right' });
 
-    pdf.setTextColor(...dark);
-    pdf.text(formatDate(order.createdAt), 192, 54, { align: 'right' });
-    pdf.setTextColor(...accent);
-    pdf.text(order.status || 'Pending', 192, 63, { align: 'right' });
-    pdf.setTextColor(...dark);
-    pdf.text(formatDocumentCurrency(total), 192, 72, { align: 'right' });
+    // Invoice Number
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(...lightGray);
+    pdf.text('Invoice No.', 180, 26, { align: 'right' });
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...text);
+    pdf.text(invoiceNumber, 180, 31, { align: 'right' });
+
+    // DIVIDER
+    pdf.setDrawColor(...borderGray);
+    pdf.setLineWidth(0.3);
+    pdf.line(14, 38, 196, 38);
+
+    // BILLING SECTION
+    let yPos = 45;
+
+    // Bill To
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(...text);
+    pdf.text('BILL TO:', 14, yPos);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(...text);
+    pdf.text(customer.name, 14, yPos + 6);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(...text);
+    const addressLines = pdf.splitTextToSize(customer.address, 80);
+    pdf.text(addressLines, 14, yPos + 11);
+
+    let addressY = yPos + 11 + addressLines.length * 3.5;
+    pdf.text(customer.phone, 14, addressY);
+    pdf.text(customer.email, 14, addressY + 5);
+
+    // INVOICE DETAILS - Right Column
+    const detailX = 130;
+    const details = [
+      ['Date:', formatDate(order.createdAt)],
+      ['Status:', order.status || 'Pending'],
+      ['Order No:', getOrderNumber(order) || 'N/A'],
+    ];
+
+    details.forEach((detail, idx) => {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...lightGray);
+      pdf.text(detail[0], detailX, yPos + idx * 5.5);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(...text);
+      pdf.text(detail[1], detailX + 20, yPos + idx * 5.5);
+    });
+
+    // ITEMS TABLE
+    yPos = 85;
 
     autoTable(pdf, {
-      startY: 88,
-      head: [['Item', 'Qty', 'Rate', 'Amount']],
+      startY: yPos,
+      head: [['Item Description', 'Qty', 'Unit Price', 'Amount']],
       body: items.map((item) => [
         item.name || 'Unnamed item',
-        item.qty,
+        String(item.qty),
         formatDocumentCurrency(item.price),
         formatDocumentCurrency(item.total),
       ]),
-      theme: 'grid',
+      theme: 'plain',
       styles: {
-        fontSize: 9,
-        textColor: dark,
-        lineColor: border,
-        lineWidth: 0.2,
+        fontSize: 8.5,
+        textColor: text,
+        font: 'helvetica',
         cellPadding: 4,
+        lineColor: borderGray,
+        lineWidth: 0.3,
       },
       headStyles: {
-        fillColor: light,
-        textColor: dark,
+        textColor: white,
+        fillColor: darkGray,
         fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'left',
+        lineColor: darkGray,
       },
       bodyStyles: {
-        fillColor: [255, 255, 255],
+        lineColor: borderGray,
       },
       columnStyles: {
-        0: { cellWidth: 106 },
+        0: { cellWidth: 90, halign: 'left' },
         1: { halign: 'center', cellWidth: 18 },
-        2: { halign: 'right', cellWidth: 32 },
-        3: { halign: 'right', cellWidth: 36 },
+        2: { halign: 'right', cellWidth: 35 },
+        3: { halign: 'right', cellWidth: 35 },
       },
     });
 
-    const finalY = pdf.lastAutoTable?.finalY || 88;
+    // TOTALS SECTION
+    const finalY = pdf.lastAutoTable?.finalY || 140;
+    const totalsX = 130;
+    const totalsY = finalY + 8;
 
-    pdf.setDrawColor(...border);
-    pdf.roundedRect(126, finalY + 10, 70, 30, 4, 4);
-    pdf.setTextColor(...slate);
-    pdf.text('Subtotal', 132, finalY + 20);
-    pdf.text('Shipping', 132, finalY + 28);
-    pdf.setTextColor(...dark);
-    pdf.text(formatDocumentCurrency(total), 190, finalY + 20, {
-      align: 'right',
-    });
-    pdf.text('Included', 190, finalY + 28, { align: 'right' });
-
-    pdf.setFillColor(...light);
-    pdf.roundedRect(126, finalY + 44, 70, 18, 4, 4, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Grand Total', 132, finalY + 55);
-    pdf.text(formatDocumentCurrency(total), 190, finalY + 55, {
-      align: 'right',
-    });
-
+    // Subtotal Line
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(...slate);
-    pdf.text('Thank you for your business.', 14, 285);
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(...text);
+    pdf.text('Subtotal:', totalsX, totalsY);
+    pdf.text(formatDocumentCurrency(total), 196, totalsY, { align: 'right' });
 
-    pdf.save(`${getOrderNumber(order)}.pdf`);
+    // Shipping Line
+    pdf.text('Shipping:', totalsX, totalsY + 5);
+    pdf.text('FREE', 196, totalsY + 5, { align: 'right' });
+
+    // Tax Line
+    pdf.text('Tax:', totalsX, totalsY + 10);
+    pdf.text('Included', 196, totalsY + 10, { align: 'right' });
+
+    // TOTAL DIVIDER
+    pdf.setDrawColor(...borderGray);
+    pdf.setLineWidth(0.3);
+    pdf.line(totalsX, totalsY + 14, 196, totalsY + 14);
+
+    // GRAND TOTAL
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(...darkGray);
+    pdf.text('TOTAL DUE:', totalsX, totalsY + 20);
+    pdf.setFontSize(12);
+    pdf.text(formatDocumentCurrency(total), 196, totalsY + 20, {
+      align: 'right',
+    });
+
+    // FOOTER DIVIDER
+    pdf.setDrawColor(...borderGray);
+    pdf.setLineWidth(0.3);
+    pdf.line(14, 260, 196, 260);
+
+    // FOOTER
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...lightGray);
+    pdf.text(
+      'Payment Terms: 30 days net | Delivery: 5-7 working days | Thank you for your business',
+      105,
+      267,
+      { align: 'center' }
+    );
+
+    pdf.save(`${invoiceNumber}.pdf`);
   };
 
-  const handlePrintOrder = (order) => {
+  const handlePrintOrder = async (order) => {
     const customer = getCustomerInfo(order);
     const items = getOrderItems(order);
     const total = getOrderTotal(order);
-    const statusStyles = {
-      Pending: 'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
-      Processing: 'background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;',
-      Shipped: 'background:#f5f3ff;color:#6d28d9;border:1px solid #c4b5fd;',
-      Delivered: 'background:#ecfdf5;color:#047857;border:1px solid #86efac;',
-      Cancel: 'background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;',
-    };
-    const statusInlineStyle =
-      statusStyles[order.status] ||
-      'background:#f8fafc;color:#334155;border:1px solid #cbd5e1;';
-    const printWindow = window.open('', '_blank', 'width=1100,height=800');
+    let invoiceNumber = generateInvoiceNumber();
+
+    const printWindow = window.open('', '_blank', 'width=1100,height=900');
 
     if (!printWindow) {
       toast.error('Please allow pop-ups to print the invoice');
       return;
     }
 
+    try {
+      const invoiceResult = await createInvoiceRecord(order, 'print');
+      invoiceNumber = invoiceResult.invoiceNumber;
+      if (invoiceResult.isExisting) {
+        toast.info(
+          'Invoice already exists for this order. Reusing same number.'
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      toast.warning('Invoice opened, but failed to save in invoice tab');
+    }
+
     const itemRows = items
       .map(
-        (item) => `
-          <tr>
-            <td>${item.name || 'Unnamed item'}</td>
-            <td style="text-align:center;">${item.qty}</td>
-            <td style="text-align:right;">${formatDocumentCurrency(item.price)}</td>
-            <td style="text-align:right;">${formatDocumentCurrency(item.total)}</td>
+        (item, idx) => `
+          <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+            <td style="padding: 12px; border-bottom: 1px solid #d1d5db; font-size: 13px; color: #374151;">${item.name || 'Unnamed item'}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #d1d5db; text-align: center; font-size: 13px; color: #374151;">${item.qty}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #d1d5db; text-align: right; font-size: 13px; color: #374151;">${formatDocumentCurrency(item.price)}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #d1d5db; text-align: right; font-size: 13px; color: #374151; font-weight: 600;">${formatDocumentCurrency(item.total)}</td>
           </tr>
         `
       )
@@ -481,180 +756,328 @@ export default function OrderManagement() {
       <!doctype html>
       <html>
         <head>
-          <title>${getOrderNumber(order)}</title>
+          <title>${invoiceNumber}</title>
           <style>
-            body {
+            * {
               margin: 0;
-              padding: 32px;
-              background: #f8fafc;
-              font-family: Arial, sans-serif;
-              color: #0f172a;
+              padding: 0;
+              box-sizing: border-box;
             }
-            .sheet {
-              max-width: 920px;
+
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              color: #1f2937;
+              background: #ffffff;
+              padding: 20px;
+              line-height: 1.5;
+            }
+
+            .container {
+              max-width: 900px;
               margin: 0 auto;
-              background: #fff;
-              border: 1px solid #e2e8f0;
-              border-radius: 24px;
-              overflow: hidden;
+              background: #ffffff;
             }
-            .hero {
-              background: linear-gradient(135deg, #0f172a, #1e3a8a);
-              color: #fff;
-              padding: 28px 32px;
+
+            /* TOP ACCENT LINE */
+            .accent-line {
+              height: 3px;
+              background: #1f2937;
+              margin-bottom: 30px;
+            }
+
+            /* HEADER */
+            .header {
               display: flex;
               justify-content: space-between;
-              gap: 24px;
+              align-items: flex-start;
+              margin-bottom: 30px;
+              padding-bottom: 20px;
+              border-bottom: 1px solid #d1d5db;
             }
-            .hero h1 {
-              margin: 0 0 6px;
+
+            .header-left h1 {
               font-size: 28px;
+              font-weight: 600;
+              color: #1f2937;
+              margin-bottom: 4px;
             }
-            .hero p {
-              margin: 0;
-              color: rgba(255,255,255,0.75);
+
+            .header-left p {
+              font-size: 13px;
+              color: #6b7280;
             }
-            .content {
-              padding: 28px 32px 36px;
+
+            .header-right {
+              text-align: right;
             }
-            .grid {
-              display: grid;
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 18px;
-              margin-bottom: 24px;
+
+            .header-right h2 {
+              font-size: 24px;
+              font-weight: 600;
+              color: #1f2937;
+              margin-bottom: 6px;
             }
-            .card {
-              border: 1px solid #e2e8f0;
-              border-radius: 18px;
-              padding: 18px;
-            }
-            .label {
+
+            .header-right .order-label {
               font-size: 12px;
-              text-transform: uppercase;
-              letter-spacing: 0.08em;
-              color: #64748b;
-              margin-bottom: 10px;
+              color: #6b7280;
+              margin-bottom: 2px;
             }
-            .value {
-              font-size: 20px;
-              font-weight: 700;
-              margin-bottom: 8px;
-            }
-            .muted {
+
+            .header-right .order-number {
               font-size: 14px;
-              color: #475569;
-              line-height: 1.6;
+              font-weight: 600;
+              color: #1f2937;
             }
-            .status {
-              display: inline-block;
-              border: 1px solid #e2e8f0;
-              border-radius: 999px;
-              padding: 6px 12px;
-              font-size: 12px;
+
+            /* INFO GRID */
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 30px;
+              margin-bottom: 30px;
+            }
+
+            .info-box h3 {
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #1f2937;
               font-weight: 700;
+              letter-spacing: 0.5px;
+              margin-bottom: 12px;
+              padding-bottom: 8px;
+              border-bottom: 1px solid #d1d5db;
             }
+
+            .info-box p {
+              font-size: 13px;
+              color: #374151;
+              line-height: 1.6;
+              margin-bottom: 4px;
+            }
+
+            .info-row {
+              margin-top: 8px;
+              padding-top: 8px;
+              border-top: 1px solid #d1d5db;
+            }
+
+            .info-label {
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #6b7280;
+              font-weight: 600;
+              margin-bottom: 2px;
+            }
+
+            .info-value {
+              font-size: 13px;
+              color: #1f2937;
+              font-weight: 500;
+            }
+
+            /* TABLE */
+            .table-section {
+              margin-bottom: 30px;
+            }
+
+            .table-section h3 {
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #1f2937;
+              font-weight: 700;
+              letter-spacing: 0.5px;
+              margin-bottom: 12px;
+              padding-bottom: 8px;
+              border-bottom: 1px solid #d1d5db;
+            }
+
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 8px;
             }
-            th {
-              background: #f8fafc;
-              color: #334155;
+
+            table thead {
+              background: #1f2937;
+              color: white;
+            }
+
+            table th {
+              padding: 12px;
               text-align: left;
-              padding: 12px 14px;
               font-size: 12px;
+              font-weight: 600;
               text-transform: uppercase;
-              letter-spacing: 0.06em;
+              letter-spacing: 0.3px;
             }
-            td {
-              border-top: 1px solid #e2e8f0;
-              padding: 14px;
-              font-size: 14px;
+
+            table th:nth-child(2),
+            table th:nth-child(3),
+            table th:nth-child(4) {
+              text-align: right;
             }
-            .totals {
-              width: 320px;
-              margin-left: auto;
-              margin-top: 24px;
-              border: 1px solid #e2e8f0;
-              border-radius: 18px;
-              padding: 18px;
+
+            /* TOTALS */
+            .totals-section {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 30px;
             }
-            .totals-row {
+
+            .totals-box {
+              width: 280px;
+              border: 1px solid #d1d5db;
+            }
+
+            .total-row {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 12px;
-              color: #475569;
+              padding: 10px 15px;
+              border-bottom: 1px solid #d1d5db;
+              font-size: 13px;
             }
+
+            .total-row .label {
+              color: #6b7280;
+              font-weight: 500;
+            }
+
+            .total-row .value {
+              color: #1f2937;
+              font-weight: 600;
+            }
+
             .grand-total {
-              margin-top: 16px;
-              padding-top: 14px;
-              border-top: 1px solid #e2e8f0;
               display: flex;
               justify-content: space-between;
-              font-size: 20px;
+              padding: 14px 15px;
+              background: #1f2937;
+              color: white;
+              font-size: 14px;
               font-weight: 700;
             }
+
+            /* FOOTER */
+            .footer {
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid #d1d5db;
+              text-align: center;
+            }
+
+            .footer p {
+              font-size: 12px;
+              color: #6b7280;
+              line-height: 1.6;
+              margin-bottom: 4px;
+            }
+
+            /* PRINT STYLES */
             @media print {
               body {
-                background: #fff;
                 padding: 0;
+                background: white;
               }
-              .sheet {
-                border: none;
-                border-radius: 0;
+
+              .container {
+                box-shadow: none;
               }
             }
           </style>
         </head>
         <body>
-          <div class="sheet">
-            <div class="hero">
-              <div>
+          <div class="container">
+            <!-- ACCENT LINE -->
+            <div class="accent-line"></div>
+
+            <!-- HEADER -->
+            <div class="header">
+              <div class="header-left">
                 <h1>Himalaya Crackers</h1>
-                <p>Sales order preview</p>
+                <p>Premium Quality Crackers & Fireworks</p>
               </div>
-              <div>
-                <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; opacity:0.72; margin-bottom:8px;">Order</div>
-                <div style="font-size:24px; font-weight:700;">${getOrderNumber(order)}</div>
+              <div class="header-right">
+                <h2>INVOICE</h2>
+                <div class="order-label">Invoice No.</div>
+                <div class="order-number">${invoiceNumber}</div>
               </div>
             </div>
-            <div class="content">
-              <div class="grid">
-                <div class="card">
-                  <div class="label">Customer</div>
-                  <div class="value">${customer.name}</div>
-                  <div class="muted">${customer.address}</div>
-                  <div class="muted">${customer.phone}</div>
-                  <div class="muted">${customer.email}</div>
+
+            <!-- INFO GRID -->
+            <div class="info-grid">
+              <div class="info-box">
+                <h3>Bill To</h3>
+                <p><strong>${customer.name}</strong></p>
+                <p>${customer.address}</p>
+                <p>${customer.phone}</p>
+                <p>${customer.email}</p>
+              </div>
+
+              <div class="info-box">
+                <h3>Order Details</h3>
+                <div class="info-row">
+                  <div class="info-label">Order Date</div>
+                  <div class="info-value">${formatDate(order.createdAt)}</div>
                 </div>
-                <div class="card">
-                  <div class="label">Order Details</div>
-                  <div class="muted" style="margin-bottom:10px;">Date: ${formatDate(order.createdAt)}</div>
-                  <div class="muted" style="margin-bottom:10px;">Amount: ${formatDocumentCurrency(total)}</div>
-                  <span class="status" style="${statusInlineStyle}">${order.status || 'Pending'}</span>
+                <div class="info-row">
+                  <div class="info-label">Status</div>
+                  <div class="info-value">${order.status || 'Pending'}</div>
+                </div>
+                <div class="info-row">
+                  <div class="info-label">Order No</div>
+                  <div class="info-value">${getOrderNumber(order) || 'N/A'}</div>
                 </div>
               </div>
+            </div>
+
+            <!-- TABLE -->
+            <div class="table-section">
+              <h3>Order Items</h3>
               <table>
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th style="text-align:center;">Qty</th>
-                    <th style="text-align:right;">Rate</th>
-                    <th style="text-align:right;">Amount</th>
+                    <th>Item Description</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${itemRows}
                 </tbody>
               </table>
-              <div class="totals">
-                <div class="totals-row"><span>Subtotal</span><strong>${formatDocumentCurrency(total)}</strong></div>
-                <div class="totals-row"><span>Shipping</span><strong>Included</strong></div>
-                <div class="grand-total"><span>Grand Total</span><span>${formatDocumentCurrency(total)}</span></div>
+            </div>
+
+            <!-- TOTALS -->
+            <div class="totals-section">
+              <div class="totals-box">
+                <div class="total-row">
+                  <span class="label">Subtotal</span>
+                  <span class="value">${formatDocumentCurrency(total)}</span>
+                </div>
+                <div class="total-row">
+                  <span class="label">Shipping</span>
+                  <span class="value">FREE</span>
+                </div>
+                <div class="total-row">
+                  <span class="label">Tax</span>
+                  <span class="value">Included</span>
+                </div>
+                <div class="grand-total">
+                  <span>TOTAL DUE</span>
+                  <span>${formatDocumentCurrency(total)}</span>
+                </div>
               </div>
             </div>
+
+            <!-- FOOTER -->
+            <div class="footer">
+              <p><strong>Payment Terms:</strong> 30 days net</p>
+              <p><strong>Delivery:</strong> 5-7 working days</p>
+              <p>Thank you for your business. For queries, contact: info@himalayacrackers.com</p>
+            </div>
           </div>
+
           <script>
             window.onload = function () {
               window.print();
@@ -680,14 +1103,6 @@ export default function OrderManagement() {
 
   return (
     <div className="space-y-4">
-      {showNewOrderModal && (
-        <NewOrderModal
-          onClose={() => setShowNewOrderModal(false)}
-          onSave={handleSaveOrder}
-          products={availableProducts}
-          isSaving={isSaving}
-        />
-      )}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -698,54 +1113,78 @@ export default function OrderManagement() {
           <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-900">
             Sales Orders
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Manage customer orders, dispatch status, and printable sales
-            documents.
+          <p className="mt-1 text-sm text-slate-600">
+            Manage customer orders, track shipments, and handle sales documents
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleExportCSV}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleMigrateOrders}
+            disabled={isMigrating}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-100 hover:border-amber-300 disabled:opacity-50"
+            title="Update existing orders to new ORD-26MM-[RAND] format"
           >
-            Export
+            {isMigrating ? 'Migrating...' : 'Migrate Orders'}
           </button>
-          <button 
-            onClick={() => setShowNewOrderModal(true)}
-            className="rounded-md bg-[#0f6fff] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#0c5dd4]"
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:border-slate-300"
           >
-            New Sales Order
+            <Download size={16} />
+            Export CSV
           </button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Orders', value: orders.length, icon: ShoppingBag },
-          { label: 'Open Orders', value: openOrders, icon: Truck },
+          {
+            label: 'Total Orders',
+            value: orders.length,
+            icon: ShoppingBag,
+            bg: 'bg-blue-50',
+            icon_color: 'text-blue-600',
+          },
+          {
+            label: 'Open Orders',
+            value: openOrders,
+            icon: Truck,
+            bg: 'bg-amber-50',
+            icon_color: 'text-amber-600',
+          },
           {
             label: 'Revenue',
             value: formatCurrency(totalRevenue),
             icon: CircleDollarSign,
+            bg: 'bg-emerald-50',
+            icon_color: 'text-emerald-600',
           },
-          { label: 'Items Sold', value: itemUnits, icon: PackageSearch },
+          {
+            label: 'Delivered',
+            value: deliveredOrders,
+            icon: Truck,
+            bg: 'bg-green-50',
+            icon_color: 'text-green-600',
+          },
         ].map((item) => (
           <div
             key={item.label}
-            className="rounded-md border border-slate-200 bg-white px-4 py-4 shadow-sm"
+            className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm hover:shadow-md transition-shadow"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                   {item.label}
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                <p className="mt-2.5 text-3xl font-bold text-slate-900">
                   {item.value}
                 </p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-                <item.icon size={18} />
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-lg ${item.bg}`}
+              >
+                <item.icon size={20} className={item.icon_color} />
               </div>
             </div>
           </div>
@@ -755,21 +1194,21 @@ export default function OrderManagement() {
       <section className="rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-4 md:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="relative w-full xl:max-w-md">
+            <div className="relative w-full xl:max-w-lg">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={16}
+                size={18}
               />
               <input
                 type="text"
-                placeholder="Search order no, customer, phone or email"
+                placeholder="Search order number, customer name, email or phone..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="h-10 w-full rounded-md border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-500"
+                className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 overflow-x-auto pb-2">
               {statusOptions.map((status) => {
                 const count =
                   status === 'All'
@@ -781,9 +1220,16 @@ export default function OrderManagement() {
                     key={status}
                     type="button"
                     onClick={() => setFilter(status)}
-                    className={`rounded-md border px-3 py-2 text-sm font-medium transition ${filter === status ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition whitespace-nowrap ${
+                      filter === status
+                        ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
                   >
-                    {status} ({count})
+                    {status}{' '}
+                    <span className="inline-block ml-1 w-4 text-right font-semibold text-xs">
+                      {count}
+                    </span>
                   </button>
                 );
               })}
@@ -791,474 +1237,368 @@ export default function OrderManagement() {
           </div>
         </div>
 
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 border-b border-slate-200 xl:border-b-0 xl:border-r">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:px-5">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={toggleVisibleSelection}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600"
-                  aria-label={
-                    allVisibleSelected
-                      ? 'Clear visible selections'
-                      : 'Select visible orders'
-                  }
-                >
-                  {allVisibleSelected ? (
-                    <CheckSquare size={16} />
-                  ) : (
-                    <Square size={16} />
-                  )}
-                </button>
-                <div>
-                  <p className="font-medium text-slate-800">
-                    {filteredOrders.length} records
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {selectedOrders.length > 0
-                      ? `${selectedOrders.length} selected`
-                      : `${deliveredOrders} delivered orders in all records`}
-                  </p>
-                </div>
-              </div>
-              <div className="hidden items-center gap-2 md:flex">
-                <CalendarDays size={15} className="text-slate-400" />
-                <span>Last synced from Firestore</span>
-              </div>
+        <div className="rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-linear-to-r from-slate-50 to-white px-4 py-4 text-sm text-slate-600 md:px-5">
+            <div>
+              <p className="font-semibold text-slate-800">
+                {filteredOrders.length} records
+              </p>
+              <p className="text-xs text-slate-500">
+                {deliveredOrders} delivered in total
+              </p>
             </div>
-
-            <div className="hidden md:block">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-white">
-                    <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      <th className="px-5 py-3">Sel</th>
-                      <th className="px-5 py-3">Sales Order</th>
-                      <th className="px-5 py-3">Customer</th>
-                      <th className="px-5 py-3">Date</th>
-                      <th className="px-5 py-3">Amount</th>
-                      <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {filteredOrders.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="px-5 py-16 text-center">
-                          <div className="mx-auto max-w-sm space-y-2">
-                            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
-                              <PackageSearch size={18} />
-                            </div>
-                            <p className="text-sm font-medium text-slate-900">
-                              No sales orders found
-                            </p>
-                            <p className="text-sm text-slate-500">
-                              Change the filter or search text to continue.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-
-                    {filteredOrders.map((order) => {
-                      const customer = getCustomerInfo(order);
-                      const total = getOrderTotal(order);
-                      const statusTheme = statusThemes[order.status] || {
-                        badge: 'border-slate-200 bg-slate-50 text-slate-700',
-                        dot: 'bg-slate-400',
-                      };
-                      const isActive = activeOrder?.id === order.id;
-
-                      return (
-                        <tr
-                          key={order.id}
-                          className={
-                            isActive ? 'bg-blue-50/40' : 'hover:bg-slate-50'
-                          }
-                        >
-                          <td className="px-5 py-4">
-                            <button
-                              type="button"
-                              onClick={() => toggleOrderSelection(order.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600"
-                              aria-label={`Select ${getOrderNumber(order)}`}
-                            >
-                              {selectedOrders.includes(order.id) ? (
-                                <CheckSquare size={16} />
-                              ) : (
-                                <Square size={16} />
-                              )}
-                            </button>
-                          </td>
-                          <td className="px-5 py-4">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOrder(order)}
-                              className="text-left"
-                            >
-                              <p className="font-semibold text-slate-900">
-                                {getOrderNumber(order)}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {getOrderItems(order).length} line items
-                              </p>
-                            </button>
-                          </td>
-                          <td className="px-5 py-4">
-                            <p className="font-medium text-slate-800">
-                              {customer.name}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {customer.phone}
-                            </p>
-                          </td>
-                          <td className="px-5 py-4 text-sm text-slate-600">
-                            {formatDate(order.createdAt)}
-                          </td>
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-slate-900">
-                              {formatCurrency(total)}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {customer.email}
-                            </p>
-                          </td>
-                          <td className="px-5 py-4">
-                            <select
-                              value={order.status || 'Pending'}
-                              onChange={(event) =>
-                                handleUpdateStatus(order.id, event.target.value)
-                              }
-                              className={`rounded-md border px-3 py-2 text-xs font-semibold outline-none transition ${statusTheme.badge}`}
-                            >
-                              {statusOptions
-                                .filter((status) => status !== 'All')
-                                .map((status) => (
-                                  <option key={status} value={status}>
-                                    {status}
-                                  </option>
-                                ))}
-                            </select>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedOrder(order)}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                <FileText size={15} />
-                                Open
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteOrder(order.id)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                                aria-label={`Delete ${getOrderNumber(order)}`}
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="grid gap-3 p-4 md:hidden">
-              {filteredOrders.length === 0 && (
-                <div className="rounded-md border border-slate-200 bg-white p-8 text-center">
-                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
-                    <PackageSearch size={18} />
-                  </div>
-                  <p className="text-sm font-medium text-slate-900">
-                    No sales orders found
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Try a different search or status.
-                  </p>
-                </div>
-              )}
-
-              {filteredOrders.map((order) => {
-                const customer = getCustomerInfo(order);
-                const total = getOrderTotal(order);
-                const statusTheme = statusThemes[order.status] || {
-                  badge: 'border-slate-200 bg-slate-50 text-slate-700',
-                  dot: 'bg-slate-400',
-                };
-
-                return (
-                  <div
-                    key={order.id}
-                    className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="text-left"
-                        >
-                          <p className="text-sm font-semibold text-slate-900">
-                            {getOrderNumber(order)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatDate(order.createdAt)}
-                          </p>
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleOrderSelection(order.id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600"
-                      >
-                        {selectedOrders.includes(order.id) ? (
-                          <CheckSquare size={16} />
-                        ) : (
-                          <Square size={16} />
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {customer.name}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {customer.phone}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            Amount
-                          </p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">
-                            {formatCurrency(total)}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold ${statusTheme.badge}`}
-                        >
-                          <span
-                            className={`h-2 w-2 rounded-full ${statusTheme.dot}`}
-                          ></span>
-                          {order.status || 'Pending'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="flex-1 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="hidden items-center gap-2 md:flex">
+              <CalendarDays size={15} className="text-slate-400" />
+              <span className="text-xs text-slate-400">Real-time</span>
             </div>
           </div>
 
-          <aside className="bg-slate-50 xl:min-h-180">
-            {activeOrder ? (
-              <div className="h-full p-4 md:p-5">
-                <div className="sticky top-5 space-y-4">
-                  <div className="rounded-md border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-4 py-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        Selected Order
-                      </p>
-                      <h2 className="mt-1 text-xl font-semibold text-slate-900">
-                        {getOrderNumber(activeOrder)}
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Created on {formatDate(activeOrder.createdAt)}
-                      </p>
-                    </div>
-
-                    <div className="space-y-4 px-4 py-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            Status
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50/50 border-b border-slate-200">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-widest text-slate-600">
+                    <th className="px-5 py-3.5">Order ID</th>
+                    <th className="px-5 py-3.5">Customer</th>
+                    <th className="px-5 py-3.5">Date</th>
+                    <th className="px-5 py-3.5">Amount</th>
+                    <th className="px-5 py-3.5">Status</th>
+                    <th className="px-5 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {filteredOrders.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-5 py-16 text-center">
+                        <div className="mx-auto max-w-sm space-y-2">
+                          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                            <PackageSearch size={18} />
+                          </div>
+                          <p className="text-sm font-medium text-slate-900">
+                            No sales orders found
                           </p>
-                          <span
-                            className={`mt-2 inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold ${statusThemes[activeOrder.status]?.badge || 'border-slate-200 bg-slate-50 text-slate-700'}`}
+                          <p className="text-sm text-slate-500">
+                            Change the filter or search text to continue.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {filteredOrders.map((order) => {
+                    const customer = getCustomerInfo(order);
+                    const total = getOrderTotal(order);
+                    const statusTheme = statusThemes[order.status] || {
+                      badge: 'border-slate-200 bg-slate-50 text-slate-700',
+                      dot: 'bg-slate-400',
+                    };
+                    const isActive = activeOrder?.id === order.id;
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className={`transition ${
+                          isActive
+                            ? 'bg-blue-50 hover:bg-blue-100'
+                            : 'hover:bg-slate-50'
+                        } border-b border-slate-100`}
+                      >
+                        <td className="px-5 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="text-left hover:opacity-75 transition"
                           >
-                            <span
-                              className={`h-2 w-2 rounded-full ${statusThemes[activeOrder.status]?.dot || 'bg-slate-400'}`}
-                            ></span>
-                            {activeOrder.status || 'Pending'}
-                          </span>
-                        </div>
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            Total
+                            <p className="font-bold text-slate-900">
+                              {getOrderNumber(order)}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {getOrderItems(order).length} items
+                            </p>
+                          </button>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div>
+                            <p className="font-medium text-slate-800">
+                              {customer.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {customer.phone}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm text-slate-600">
+                            {formatDate(order.createdAt)}
                           </p>
-                          <p className="mt-2 text-lg font-semibold text-slate-900">
-                            {formatCurrency(getOrderTotal(activeOrder))}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Customer
-                        </p>
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {activeCustomer.name}
-                          </p>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm text-slate-600">
-                          <MapPin size={15} className="mt-0.5 text-slate-400" />
-                          <span>{activeCustomer.address}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Phone size={15} className="text-slate-400" />
-                          <span>{activeCustomer.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Mail size={15} className="text-slate-400" />
-                          <span>{activeCustomer.email}</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Line Items
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {activeItems.length} items
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          {activeItems.map((item, index) => (
-                            <div
-                              key={`${item.id || item.name}-${index}`}
-                              className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3"
+                        </td>
+                        <td className="px-5 py-4">
+                          <div>
+                            <p className="font-bold text-slate-900">
+                              {formatCurrency(total)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {customer.email}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <select
+                            value={order.status || 'Pending'}
+                            onChange={(event) =>
+                              handleUpdateStatus(order.id, event.target.value)
+                            }
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold outline-none transition cursor-pointer ${statusTheme.badge}`}
+                          >
+                            {statusOptions
+                              .filter((status) => status !== 'All')
+                              .map((status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                          </select>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => generateInvoicePDF(order)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition"
+                              title="Generate Invoice"
                             >
-                              <div>
-                                <p className="text-sm font-medium text-slate-800">
-                                  {item.name || 'Unnamed item'}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Qty {item.qty} x {formatCurrency(item.price)}
-                                </p>
-                              </div>
-                              <p className="text-sm font-semibold text-slate-900">
-                                {formatCurrency(item.total)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                              <FileText size={14} />
+                              <span className="hidden lg:inline">
+                                Generate Invoice
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handlePrintOrder(order)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                              title="Print"
+                            >
+                              <Printer size={14} />
+                              <span className="hidden lg:inline">Print</span>
+                            </button>
+                            <Link
+                              to={`/admin/orders/${order.id}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                              title="View Details"
+                            >
+                              <ExternalLink size={14} />
+                              <span className="hidden lg:inline">View</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+                              aria-label={`Delete ${getOrderNumber(order)}`}
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-                      <div className="rounded-md border border-slate-200 bg-white p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Document Actions
-                        </p>
-                        <div className="mt-3 grid gap-2">
-                          <button
-                            type="button"
-                            onClick={() => generateInvoicePDF(activeOrder)}
-                            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#0f6fff] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0c5dd4]"
-                          >
-                            <Download size={15} />
-                            Download PDF
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePrintOrder(activeOrder)}
-                            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <Printer size={15} />
-                            Print Template
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+          <div className="grid gap-3 p-4 md:hidden">
+            {filteredOrders.length === 0 && (
+              <div className="rounded-md border border-slate-200 bg-white p-8 text-center">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                  <PackageSearch size={18} />
                 </div>
-              </div>
-            ) : (
-              <div className="flex h-full min-h-80 items-center justify-center p-5">
-                <div className="max-w-xs text-center">
-                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-md bg-white text-slate-400 shadow-sm">
-                    <FileText size={18} />
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-slate-900">
-                    Select an order to view details
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    The selected sales order will appear here with export and
-                    print actions.
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-slate-900">
+                  No sales orders found
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Try a different search or status.
+                </p>
               </div>
             )}
-          </aside>
+
+            {filteredOrders.map((order) => {
+              const customer = getCustomerInfo(order);
+              const total = getOrderTotal(order);
+              const statusTheme = statusThemes[order.status] || {
+                badge: 'border-slate-200 bg-slate-50 text-slate-700',
+                dot: 'bg-slate-400',
+              };
+
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrder(order)}
+                        className="text-left"
+                      >
+                        <p className="text-sm font-semibold text-slate-900">
+                          {getOrderNumber(order)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {formatDate(order.createdAt)}
+                        </p>
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleOrderSelection(order.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600"
+                    >
+                      {selectedOrders.includes(order.id) ? (
+                        <CheckSquare size={16} />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {customer.name}
+                      </p>
+                      <p className="text-sm text-slate-500">{customer.phone}</p>
+                    </div>
+                    <div className="flex items-center justify-between border border-slate-200 bg-slate-50 px-3 py-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                          Amount
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">
+                          {formatCurrency(total)}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold ${statusTheme.badge}`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${statusTheme.dot}`}
+                        ></span>
+                        {order.status || 'Pending'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => generateInvoicePDF(order)}
+                        className="flex-1 min-w-max inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition"
+                        title="Generate Invoice"
+                      >
+                        <FileText size={14} />
+                        Generate Invoice
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintOrder(order)}
+                        className="flex-1 min-w-max inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                        title="Print"
+                      >
+                        <Printer size={14} />
+                        Print
+                      </button>
+                      <Link
+                        to={`/admin/orders/${order.id}`}
+                        className="flex-1 min-w-max inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                        title="View Details"
+                      >
+                        <ExternalLink size={14} />
+                        View
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
+
+      {showNewOrderModal && (
+        <NewOrderModal
+          onClose={() => setShowNewOrderModal(false)}
+          onSave={handleSaveOrder}
+          products={availableProducts}
+          isSaving={isSaving}
+        />
+      )}
     </div>
   );
 }
 
 function NewOrderModal({ onClose, onSave, products, isSaving }) {
-  const [customer, setCustomer] = useState({ name: '', mobile: '', email: '', address: '' });
+  const [customer, setCustomer] = useState({
+    name: '',
+    mobile: '',
+    email: '',
+    address: '',
+  });
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchProduct.toLowerCase())
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchProduct.toLowerCase())
   );
 
   const addItem = (product) => {
-    const existing = selectedItems.find(item => item.id === product.id);
+    const existing = selectedItems.find((item) => item.id === product.id);
     if (existing) {
-      setSelectedItems(selectedItems.map(item => 
-        item.id === product.id ? { ...item, qty: item.qty + 1 } : item
-      ));
+      setSelectedItems(
+        selectedItems.map((item) =>
+          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+        )
+      );
     } else {
-      setSelectedItems([...selectedItems, {
-        id: product.id,
-        name: product.name,
-        price: product.ourPrice,
-        qty: 1
-      }]);
+      setSelectedItems([
+        ...selectedItems,
+        {
+          id: product.id,
+          name: product.name,
+          price: product.ourPrice,
+          qty: 1,
+        },
+      ]);
     }
   };
 
   const removeItem = (id) => {
-    setSelectedItems(selectedItems.filter(item => item.id !== id));
+    setSelectedItems(selectedItems.filter((item) => item.id !== id));
   };
 
   const updateQty = (id, newQty) => {
     if (newQty < 1) return;
-    setSelectedItems(selectedItems.map(item => 
-      item.id === id ? { ...item, qty: newQty } : item
-    ));
+    setSelectedItems(
+      selectedItems.map((item) =>
+        item.id === id ? { ...item, qty: newQty } : item
+      )
+    );
   };
 
-  const total = selectedItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const total = selectedItems.reduce(
+    (sum, item) => sum + item.price * item.qty,
+    0
+  );
 
   const handleSave = () => {
     if (!customer.name) return alert('Customer name is required');
@@ -1274,8 +1614,13 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <h2 className="text-xl font-bold text-slate-900">Create New Sales Order</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+          <h2 className="text-xl font-bold text-slate-900">
+            Create New Sales Order
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+          >
             <X size={20} className="text-slate-500" />
           </button>
         </div>
@@ -1283,59 +1628,84 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Customer Details</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                Customer Details
+              </h3>
               <div className="grid gap-4">
                 <input
                   type="text"
                   placeholder="Customer Name"
                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                   value={customer.name}
-                  onChange={e => setCustomer({...customer, name: e.target.value})}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, name: e.target.value })
+                  }
                 />
                 <input
                   type="text"
                   placeholder="Mobile Number"
                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                   value={customer.mobile}
-                  onChange={e => setCustomer({...customer, mobile: e.target.value})}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, mobile: e.target.value })
+                  }
                 />
                 <input
                   type="email"
                   placeholder="Email Address"
                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                   value={customer.email}
-                  onChange={e => setCustomer({...customer, email: e.target.value})}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, email: e.target.value })
+                  }
                 />
                 <textarea
                   placeholder="Full Address"
                   rows="2"
                   className="w-full px-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                   value={customer.address}
-                  onChange={e => setCustomer({...customer, address: e.target.value})}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, address: e.target.value })
+                  }
                 />
               </div>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Add Products</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                Add Products
+              </h3>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={16}
+                />
                 <input
                   type="text"
                   placeholder="Search products..."
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                   value={searchProduct}
-                  onChange={e => setSearchProduct(e.target.value)}
+                  onChange={(e) => setSearchProduct(e.target.value)}
                 />
               </div>
               <div className="border border-slate-100 rounded-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
-                {filteredProducts.map(product => (
-                  <div key={product.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                {filteredProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  >
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{product.name}</p>
-                      <p className="text-xs text-slate-500">₹{product.ourPrice}</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        ₹{product.ourPrice}
+                      </p>
                     </div>
-                    <button onClick={() => addItem(product)} className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100">
+                    <button
+                      onClick={() => addItem(product)}
+                      className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
+                    >
                       <Plus size={16} />
                     </button>
                   </div>
@@ -1345,7 +1715,9 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Selected Items</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+              Selected Items
+            </h3>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
@@ -1358,20 +1730,39 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {selectedItems.map(item => (
+                  {selectedItems.map((item) => (
                     <tr key={item.id} className="bg-white">
-                      <td className="px-4 py-3 font-medium text-slate-900">{item.name}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {item.name}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => updateQty(item.id, item.qty - 1)} className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">-</button>
+                          <button
+                            onClick={() => updateQty(item.id, item.qty - 1)}
+                            className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50"
+                          >
+                            -
+                          </button>
                           <span className="w-8 text-center">{item.qty}</span>
-                          <button onClick={() => updateQty(item.id, item.qty + 1)} className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">+</button>
+                          <button
+                            onClick={() => updateQty(item.id, item.qty + 1)}
+                            className="w-6 h-6 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50"
+                          >
+                            +
+                          </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-600">₹{item.price}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">₹{item.price * item.qty}</td>
+                      <td className="px-4 py-3 text-right text-slate-600">
+                        ₹{item.price}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                        ₹{item.price * item.qty}
+                      </td>
                       <td className="px-4 py-3 text-center">
-                        <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600">
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="text-red-400 hover:text-red-600"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </td>
@@ -1379,7 +1770,12 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
                   ))}
                   {selectedItems.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="px-4 py-8 text-center text-slate-400">No items added yet</td>
+                      <td
+                        colSpan="5"
+                        className="px-4 py-8 text-center text-slate-400"
+                      >
+                        No items added yet
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -1390,8 +1786,12 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Grand Total</p>
-            <p className="text-2xl font-bold text-slate-900">₹{total.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+              Grand Total
+            </p>
+            <p className="text-2xl font-bold text-slate-900">
+              ₹{total.toLocaleString('en-IN')}
+            </p>
           </div>
           <div className="flex gap-3">
             <button
@@ -1405,7 +1805,11 @@ function NewOrderModal({ onClose, onSave, products, isSaving }) {
               disabled={isSaving}
               className="px-6 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-200 disabled:bg-blue-400"
             >
-              {isSaving ? <Loader2 className="animate-spin" size={18} /> : 'Save Order'}
+              {isSaving ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                'Save Order'
+              )}
             </button>
           </div>
         </div>

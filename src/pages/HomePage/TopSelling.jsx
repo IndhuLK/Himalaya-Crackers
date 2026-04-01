@@ -1,55 +1,92 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ShoppingCart, Heart, Flame, Zap, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { collection, onSnapshot } from 'firebase/firestore';
 
-// Product Data
-const products = [
-  {
-    id: 1,
-    name: '240 Shots Multi Color',
-    price: 3500,
-    mrp: 4200,
-    category: 'SKY SHOTS',
-    noise: 'High Noise',
-    image:
-      'https://images.unsplash.com/photo-1498931299472-f7a63a5a1cfa?auto=format&fit=crop&q=80&w=400',
-    tag: 'Bestseller',
-  },
-  {
-    id: 2,
-    name: '1000 Wala Giant Crackers',
-    price: 1200,
-    mrp: 1500,
-    category: 'GARLANDS',
-    noise: 'High Noise',
-    image:
-      'https://images.unsplash.com/photo-1549465220-1d8c9d9c470c?auto=format&fit=crop&q=80&w=400',
-    tag: 'Trending',
-  },
-  {
-    id: 3,
-    name: 'Flower Pots - Large',
-    price: 450,
-    mrp: 600,
-    category: 'FOUNTAINS',
-    noise: 'Low Noise',
-    image:
-      'https://images.unsplash.com/photo-1533230408703-a2321476d067?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: 4,
-    name: 'Rocket Bomb Box',
-    price: 850,
-    mrp: 1100,
-    category: 'ROCKETS',
-    noise: 'Medium Noise',
-    image:
-      'https://images.unsplash.com/photo-1507608869274-d3177c8bb4c7?auto=format&fit=crop&q=80&w=400',
-    tag: 'Hot Deal',
-  },
-];
+import { db } from '../../config/firebase';
+import { useCart } from '../../Context/CartContext';
+
+const toSlug = (value = '') =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 
 const TopSelling = () => {
+  const { addToCart } = useCart();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const list = snapshot.docs.map((entry) => ({
+          id: entry.id,
+          ...entry.data(),
+        }));
+        setProducts(list);
+        setLoading(false);
+      },
+      () => {
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const topSellingProducts = useMemo(() => {
+    const visible = products.filter(
+      (item) => item.isActive !== false && item.isOutOfStock !== true
+    );
+
+    return visible
+      .sort((a, b) => {
+        const scoreA =
+          (a.isBestSeller ? 1000 : 0) +
+          Number(a.salesCount || a.totalSold || 0) +
+          Number(a.stockQty || a.stock || 0);
+        const scoreB =
+          (b.isBestSeller ? 1000 : 0) +
+          Number(b.salesCount || b.totalSold || 0) +
+          Number(b.stockQty || b.stock || 0);
+        return scoreB - scoreA;
+      })
+      .slice(0, 4);
+  }, [products]);
+
+  if (loading) {
+    return (
+      <section className="py-20 bg-[#F8FAFC] font-poppins">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="mb-8">
+            <p className="text-orange-500 font-bold tracking-widest uppercase mb-2 text-xs">
+              Customer Favorites
+            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight capitalize">
+              Top Selling <span className="text-[#1E60F2]">Crackers</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="aspect-4/5 rounded-2xl border border-slate-100 bg-white animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (topSellingProducts.length === 0) {
+    return null;
+  }
+
   return (
     <section className="py-20 bg-[#F8FAFC] font-poppins">
       <div className="max-w-7xl mx-auto px-6">
@@ -83,68 +120,90 @@ const TopSelling = () => {
 
         {/* Product Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {products.map((product) => (
-            <div key={product.id} className="group relative">
-              {/* Image */}
-              <div className="relative aspect-[4/5] overflow-hidden rounded-2xl shadow-sm bg-white border border-slate-100">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+          {topSellingProducts.map((product, idx) => {
+            const price = Number(product.ourPrice || product.price || 0);
+            const mrp = Number(product.mrpPrice || product.mrp || price);
+            const discount =
+              mrp > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0;
+            const category = (product.category || 'Crackers').toUpperCase();
+            const noise = String(product.noiseLevel || 'High Noise');
+            const tag = product.isBestSeller
+              ? 'Bestseller'
+              : Number(product.offerPercentage || 0) > 0
+                ? 'Hot Deal'
+                : idx === 0
+                  ? 'Trending'
+                  : null;
+            const targetSlug =
+              product.slug || toSlug(product.name || product.id);
 
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            return (
+              <div key={product.id} className="group relative">
+                {/* Image */}
+                <div className="relative aspect-4/5 overflow-hidden rounded-2xl shadow-sm bg-white border border-slate-100">
+                  <img
+                    src={product.images?.[0] || product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
 
-                {/* Tag */}
-                {product.tag && (
-                  <span className="absolute top-3 left-3 bg-white/95 backdrop-blur text-[#1E60F2] text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
-                    {product.tag}
-                  </span>
-                )}
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                {/* Wishlist */}
-                <button className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full text-slate-400 hover:text-red-500 transition-colors">
-                  <Heart size={15} />
-                </button>
+                  {/* Tag */}
+                  {tag && (
+                    <span className="absolute top-3 left-3 bg-white/95 backdrop-blur text-[#1E60F2] text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                      {tag}
+                    </span>
+                  )}
 
-                {/* Floating Cart */}
-                <button className="absolute bottom-3 right-3 w-9 h-9 bg-[#1E60F2] text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 duration-300">
-                  <ShoppingCart size={15} />
-                </button>
-              </div>
+                  {/* Wishlist */}
+                  <button className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full text-slate-400 hover:text-red-500 transition-colors">
+                    <Heart size={15} />
+                  </button>
 
-              {/* Content */}
-              <div className="mt-3 space-y-1.5 px-0.5">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-                  <span className="text-[#1E60F2]">{product.category}</span>
-                  <span className="flex items-center gap-0.5 text-orange-500">
-                    <Flame size={10} />
-                    {product.noise.replace(' Noise', '')}
-                  </span>
+                  {/* Floating Cart */}
+                  <button
+                    onClick={() => addToCart(product, 1)}
+                    className="absolute bottom-3 right-3 w-9 h-9 bg-[#1E60F2] text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 duration-300"
+                  >
+                    <ShoppingCart size={15} />
+                  </button>
                 </div>
 
-                <h3 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-[#1E60F2] transition-colors">
-                  {product.name}
-                </h3>
+                {/* Content */}
+                <div className="mt-3 space-y-1.5 px-0.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <span className="text-[#1E60F2]">{category}</span>
+                    <span className="flex items-center gap-0.5 text-orange-500">
+                      <Flame size={10} />
+                      {noise.replace(' Noise', '')}
+                    </span>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-black text-slate-900">
-                    ₹{product.price}
-                  </span>
-                  <span className="text-xs line-through text-slate-400">
-                    ₹{product.mrp}
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                    {Math.round(
-                      ((product.mrp - product.price) / product.mrp) * 100
+                  <Link to={`/product/${targetSlug}`}>
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-[#1E60F2] transition-colors">
+                      {product.name}
+                    </h3>
+                  </Link>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-black text-slate-900">
+                      ₹{price}
+                    </span>
+                    <span className="text-xs line-through text-slate-400">
+                      ₹{mrp}
+                    </span>
+                    {discount > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        {discount}% OFF
+                      </span>
                     )}
-                    % OFF
-                  </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Mobile View All Button */}

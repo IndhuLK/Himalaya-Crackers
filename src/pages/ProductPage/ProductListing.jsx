@@ -17,9 +17,18 @@ import { db } from '../../config/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useCart } from '../../Context/CartContext';
 
+const toSlug = (value = '') =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
 const ProductListing = () => {
   const { addToCart } = useCart();
   const [products, setProducts] = useState([]);
+  const [categoryDocs, setCategoryDocs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   /* UI STATE */
@@ -28,7 +37,9 @@ const ProductListing = () => {
   const [hoveredProduct, setHoveredProduct] = useState(null);
 
   /* FILTER STATE */
-  const activeCategory = searchParams.get('category') || 'All';
+  const activeCategorySlugFromUrl =
+    searchParams.get('categorySlug') ||
+    toSlug(searchParams.get('category') || 'all');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 200000 });
   const [searchTerm, setSearchTerm] = useState('');
   const [noise, setNoise] = useState('All');
@@ -36,29 +47,73 @@ const ProductListing = () => {
   const [sortBy, setSortBy] = useState('popularity');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
       const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setProducts(list);
       setLoading(false);
     });
-    return () => unsub();
+
+    const unsubCategories = onSnapshot(collection(db, 'categories'), (snap) => {
+      const list = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((cat) => cat.isActive !== false && cat.name)
+        .map((cat) => ({
+          name: cat.name.trim(),
+          slug: cat.slug || toSlug(cat.name),
+        }));
+      setCategoryDocs(list);
+    });
+
+    return () => {
+      unsubProducts();
+      unsubCategories();
+    };
   }, []);
 
   const categories = useMemo(() => {
-    const cats = [...new Set(products.map((p) => p.category))];
-    return ['All', ...cats];
+    const productCategories = [
+      ...new Set(
+        products.map((p) => (p.category || '').trim()).filter(Boolean)
+      ),
+    ].map((name) => ({ name, slug: toSlug(name) }));
+
+    const adminCategories = Array.isArray(categoryDocs) ? categoryDocs : [];
+    const baseCategories = adminCategories.length
+      ? adminCategories
+      : productCategories;
+    const deduped = baseCategories.filter(
+      (cat, idx, arr) => arr.findIndex((x) => x.slug === cat.slug) === idx
+    );
+
+    return [{ name: 'All', slug: 'all' }, ...deduped];
+  }, [categoryDocs, products]);
+
+  const noiseOptions = useMemo(() => {
+    const values = products
+      .map((p) => p.noiseLevel)
+      .filter(Boolean)
+      .map((v) => String(v).trim());
+    return ['All', ...new Set(values)];
   }, [products]);
+
+  const activeCategoryObj =
+    categories.find((cat) => cat.slug === activeCategorySlugFromUrl) ||
+    categories[0];
+  const activeCategoryName = activeCategoryObj?.name || 'All';
+  const activeCategorySlug = activeCategoryObj?.slug || 'all';
 
   const filteredProducts = useMemo(() => {
     let data = products.filter((p) => {
       const price = Number(p.ourPrice);
+      const productCategorySlug = p.categorySlug || toSlug(p.category || '');
       return (
-        (activeCategory === 'All' || p.category === activeCategory) &&
+        (activeCategorySlug === 'all' ||
+          productCategorySlug === activeCategorySlug) &&
         price >= priceRange.min &&
         price <= priceRange.max &&
         p.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (noise === 'All' || p.noiseLevel === noise) &&
-        (!greenOnly || p.isGreen)
+        (!greenOnly || p.isEcoFriendly || p.isGreen)
       );
     });
 
@@ -70,7 +125,7 @@ const ProductListing = () => {
     return data;
   }, [
     products,
-    activeCategory,
+    activeCategorySlug,
     priceRange,
     searchTerm,
     noise,
@@ -79,7 +134,14 @@ const ProductListing = () => {
   ]);
 
   const handleCategoryChange = (cat) => {
-    setSearchParams({ category: cat });
+    if (cat.slug === 'all') {
+      setSearchParams({ categorySlug: 'all' });
+      return;
+    }
+
+    setSearchParams({
+      categorySlug: cat.slug,
+    });
   };
 
   // ----------------------------------------------------------------------
@@ -109,16 +171,16 @@ const ProductListing = () => {
         <div className="flex flex-col gap-1">
           {categories.map((cat) => (
             <button
-              key={cat}
+              key={cat.slug}
               onClick={() => handleCategoryChange(cat)}
               className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeCategory === cat
+                activeCategorySlug === cat.slug
                   ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20 translate-x-0.5'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <span>{cat}</span>
-              {activeCategory === cat && (
+              <span>{cat.name}</span>
+              {activeCategorySlug === cat.slug && (
                 <ChevronRight size={14} className="text-emerald-400" />
               )}
             </button>
@@ -169,7 +231,7 @@ const ProductListing = () => {
           Intensity
         </h4>
         <div className="grid grid-cols-2 gap-2">
-          {['All', 'Low Noise', 'Medium Noise', 'High Noise'].map((level) => (
+          {noiseOptions.map((level) => (
             <button
               key={level}
               onClick={() => setNoise(level)}
@@ -262,9 +324,9 @@ const ProductListing = () => {
             <Sparkles size={12} /> Premium Selection
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-4 capitalize leading-tight">
-            {activeCategory === 'All'
+            {activeCategoryName === 'All'
               ? 'Explore Our Fireworks'
-              : `${activeCategory} Collection`}
+              : `${activeCategoryName} Collection`}
           </h1>
           <p className="text-slate-300 text-base md:text-lg font-medium max-w-2xl leading-relaxed">
             Light up the sky with our hand-picked, high-quality fireworks.
@@ -276,7 +338,7 @@ const ProductListing = () => {
       <div className="max-w-7xl mx-auto px-4 md:px-6 -mt-8 relative z-20">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* --- DESKTOP FILTER --- */}
-            <aside className="hidden lg:block w-64 shrink-0">
+          <aside className="hidden lg:block w-64 shrink-0">
             <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-xl shadow-slate-200/50 sticky top-24">
               {filterElements}
             </div>
@@ -341,7 +403,17 @@ const ProductListing = () => {
                                 Best Seller
                               </div>
                             )}
-                            {p.isGreen && (
+                            {p.isFestivalSpecial && (
+                              <div className="bg-linear-to-r from-violet-500 to-fuchsia-500 text-white px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md shadow-violet-500/30">
+                                Festival
+                              </div>
+                            )}
+                            {Number(p.offerPercentage) > 0 && (
+                              <div className="bg-linear-to-r from-emerald-500 to-teal-500 text-white px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md shadow-emerald-500/30">
+                                {p.offerPercentage}% Off
+                              </div>
+                            )}
+                            {(p.isEcoFriendly || p.isGreen) && (
                               <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md shadow-emerald-500/30">
                                 <Leaf size={10} />
                               </div>
@@ -353,7 +425,7 @@ const ProductListing = () => {
                         </div>
 
                         <Link
-                          to={`/product/${p.id}`}
+                          to={`/product/${p.slug || p.id}`}
                           onClick={() => window.scrollTo(0, 0)}
                           className="block w-full h-full relative z-0 mt-2"
                         >
@@ -395,7 +467,7 @@ const ProductListing = () => {
                       <div className="flex flex-col flex-1 p-3 md:p-4 relative bg-white z-30">
                         <div className="flex justify-between items-start mb-1.5 gap-1.5">
                           <Link
-                            to={`/product/${p.id}`}
+                            to={`/product/${p.slug || p.id}`}
                             onClick={() => window.scrollTo(0, 0)}
                             className="text-slate-900 font-bold text-sm leading-snug hover:text-emerald-600 transition-colors line-clamp-2"
                           >
@@ -474,7 +546,7 @@ const ProductListing = () => {
                 <button
                   onClick={() => {
                     setSearchTerm('');
-                    setSearchParams({ category: 'All' });
+                    setSearchParams({ categorySlug: 'all' });
                     setPriceRange({ min: 0, max: 100000 });
                     setNoise('All');
                     setGreenOnly(false);
@@ -509,9 +581,7 @@ const ProductListing = () => {
               </button>
             </div>
 
-            <div className="p-6 flex-1 overflow-y-auto">
-              {filterElements}
-            </div>
+            <div className="p-6 flex-1 overflow-y-auto">{filterElements}</div>
 
             <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] relative z-10">
               <button

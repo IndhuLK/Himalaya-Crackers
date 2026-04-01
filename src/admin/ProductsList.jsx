@@ -13,6 +13,14 @@ import {
 import { useInventory } from './InventoryContext';
 import { Link, useNavigate } from 'react-router-dom';
 
+const toSlug = (value = '') =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
 export default function ProductsList() {
   const { products, loading, deleteProduct } = useInventory();
   const [viewMode, setViewMode] = useState('list');
@@ -83,7 +91,9 @@ export default function ProductsList() {
             <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-200">
               <tr>
                 <th className="p-4 py-3 font-semibold">Product Details</th>
+                <th className="p-4 py-3 font-semibold">Product Slug</th>
                 <th className="p-4 py-3 font-semibold">Category</th>
+                <th className="p-4 py-3 font-semibold">Category Slug</th>
                 <th className="p-4 py-3 font-semibold text-right">Pricing</th>
                 <th className="p-4 py-3 font-semibold text-center">Stock</th>
                 <th className="p-4 py-3 font-semibold text-right">Actions</th>
@@ -121,9 +131,19 @@ export default function ProductsList() {
                     </div>
                   </td>
                   <td className="p-4">
+                    <code className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded block overflow-hidden text-ellipsis">
+                      {product.slug || toSlug(product.name || '')}
+                    </code>
+                  </td>
+                  <td className="p-4">
                     <span className="text-xs font-medium bg-gray-100 text-gray-700 px-2 py-1 rounded">
                       {product.category}
                     </span>
+                  </td>
+                  <td className="p-4">
+                    <code className="text-xs bg-blue-50 text-blue-800 px-2 py-1 rounded block overflow-hidden text-ellipsis">
+                      {product.categorySlug || toSlug(product.category || '')}
+                    </code>
                   </td>
                   <td className="p-4 text-right">
                     <div className="font-semibold text-gray-900">
@@ -215,6 +235,9 @@ export default function ProductsList() {
                 >
                   {product.name}
                 </h3>
+                <p className="text-[10px] text-blue-600 mb-2 font-medium truncate">
+                  /{product.slug || toSlug(product.name || '')}
+                </p>
 
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100 mt-auto">
                   <span

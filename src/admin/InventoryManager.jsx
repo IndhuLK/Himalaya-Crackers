@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Package,
   AlertTriangle,
   EyeOff,
-  BarChart3,
   Plus,
   Save,
   Trash2,
   Box,
   Search,
   CheckCircle2,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 import { db } from '../config/firebase';
@@ -23,14 +25,31 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 
+const toSlug = (value = '') =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
 export default function InventoryManager() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]); // from 'products' collection
   const [inventoryItems, setInventoryItems] = useState([]); // from 'inventory' collection
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+  const [isUpdatingItem, setIsUpdatingItem] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: '',
+    stockQty: 0,
+    status: 'In Stock',
+  });
 
   // Local state for the inline entry form
   const [formData, setFormData] = useState({
@@ -67,7 +86,10 @@ export default function InventoryManager() {
 
     // Categories
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snap) => {
-      const catList = snap.docs.map((doc) => doc.data().name);
+      const catList = snap.docs
+        .map((doc) => doc.data())
+        .filter((cat) => cat.isActive !== false && cat.name)
+        .map((cat) => cat.name.trim());
       setCategories(catList);
       if (catList.length > 0 && !formData.category) {
         setFormData((prev) => ({ ...prev, category: catList[0] }));
@@ -83,7 +105,7 @@ export default function InventoryManager() {
     };
   }, []);
 
-  // Combine items for display
+  // Combine products and inventory items for display
   const allItems = [...products, ...inventoryItems];
 
   // 2. Add Inventory Item (Strictly to 'inventory' collection)
@@ -130,10 +152,16 @@ export default function InventoryManager() {
       const collectionName = type === 'product' ? 'products' : 'inventory';
       const itemRef = doc(db, collectionName, id);
 
-      await updateDoc(itemRef, {
+      const payload = {
         stockQty: stockVal,
         stock: stockVal, // Maintain legacy field if needed
-      });
+      };
+
+      if (type === 'product') {
+        payload.isOutOfStock = stockVal <= 0;
+      }
+
+      await updateDoc(itemRef, payload);
     } catch (err) {
       console.error('Error updating stock:', err);
     }
@@ -148,6 +176,61 @@ export default function InventoryManager() {
     } catch (err) {
       console.error('Delete error:', err);
       toast.error('Failed to delete');
+    }
+  };
+
+  const openEditModal = (item) => {
+    const stockVal =
+      item.stockQty !== undefined ? Number(item.stockQty) : Number(item.stock);
+    setEditingItem(item);
+    setEditForm({
+      name: item.name || '',
+      category: item.category || categories[0] || 'General',
+      stockQty: Number.isNaN(stockVal) ? 0 : stockVal,
+      status:
+        item.status ||
+        (stockVal === 0
+          ? 'Out of Stock'
+          : stockVal <= 10
+            ? 'Low Stock'
+            : 'In Stock'),
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingItem(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return;
+
+    const stockVal = Number(editForm.stockQty) || 0;
+    const collectionName =
+      editingItem.type === 'product' ? 'products' : 'inventory';
+
+    setIsUpdatingItem(true);
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        category: editForm.category || 'General',
+        stockQty: stockVal,
+        stock: stockVal,
+      };
+
+      if (editingItem.type === 'product') {
+        payload.isOutOfStock = stockVal === 0;
+      } else {
+        payload.status = editForm.status;
+      }
+
+      await updateDoc(doc(db, collectionName, editingItem.id), payload);
+      toast.success('Item updated successfully');
+      closeEditModal();
+    } catch (err) {
+      console.error('Update item error:', err);
+      toast.error('Failed to update item');
+    } finally {
+      setIsUpdatingItem(false);
     }
   };
 
@@ -192,7 +275,7 @@ export default function InventoryManager() {
           <p className="text-sm text-gray-500 mt-1">Inventory Control Panel</p>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-start">
           <div className="bg-white px-5 py-3 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
             <Box className="text-blue-600" size={20} />
             <div>
@@ -218,102 +301,7 @@ export default function InventoryManager() {
         </div>
       </div>
 
-      {/* 2. QUICK ENTRY FORM (SAVES TO INVENTORY, NOT PRODUCTS) */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
-          <Plus className="text-blue-600" size={18} />
-          <h3 className="font-medium text-gray-900 text-sm">
-            New Inventory Entry
-          </h3>
-          <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-medium uppercase tracking-wide ml-2 border border-gray-200">
-            Internal Only
-          </span>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
-        >
-          <div className="md:col-span-1 space-y-1.5">
-            <label className="text-xs font-medium text-gray-700">
-              Item Name
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Packing Material"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-gray-700">
-              Initial Stock
-            </label>
-            <input
-              type="number"
-              placeholder="Qty"
-              value={formData.stock}
-              onChange={(e) =>
-                setFormData({ ...formData, stock: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-gray-700">
-              Category
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-            >
-              <option value="" disabled>
-                Select Category
-              </option>
-              {categories.map((cat, idx) => (
-                <option key={idx} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-gray-700">
-              Availability Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-            >
-              <option>In Stock</option>
-              <option>Low Stock</option>
-              <option>Out of Stock</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-blue-700 shadow-sm transition-colors flex items-center justify-center gap-2 h-9.5"
-          >
-            <Save size={16} /> Save Item
-          </button>
-        </form>
-      </div>
-
-      {/* 3. LIVE TABLE WITH FILTERS */}
+      {/* 2. LIVE TABLE WITH FILTERS */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between gap-4 bg-gray-50/50">
           <div className="relative w-full md:w-80">
@@ -398,6 +386,9 @@ export default function InventoryManager() {
                           <p className="text-xs text-gray-500 font-mono mt-0.5">
                             {product.productCode || product.id.substring(0, 8)}
                           </p>
+                          <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                            /{product.slug || toSlug(product.name || '')}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -444,15 +435,32 @@ export default function InventoryManager() {
                       )}
                     </td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={() =>
-                          handleDeleteProduct(product.id, product.type)
-                        }
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            if (product.type === 'product') {
+                              navigate('/admin/add-product', {
+                                state: { product },
+                              });
+                              return;
+                            }
+                            openEditModal(product);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteProduct(product.id, product.type)
+                          }
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -461,6 +469,121 @@ export default function InventoryManager() {
           </table>
         </div>
       </div>
+
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl border border-gray-200 shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">
+                Edit Item
+              </h3>
+              <button
+                onClick={closeEditModal}
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-700">
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-700">
+                  Category
+                </label>
+                <select
+                  value={editForm.category}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      category: e.target.value,
+                    }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                >
+                  {categories.length > 0 ? (
+                    categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="General">General</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-700">
+                    Stock Qty
+                  </label>
+                  <input
+                    type="number"
+                    value={editForm.stockQty}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        stockQty: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-700">
+                    Status
+                  </label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        status: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  >
+                    <option>In Stock</option>
+                    <option>Low Stock</option>
+                    <option>Out of Stock</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button
+                onClick={closeEditModal}
+                className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isUpdatingItem}
+                className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {isUpdatingItem ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

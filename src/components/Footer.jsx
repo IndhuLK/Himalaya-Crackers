@@ -196,9 +196,7 @@ const Footer = () => {
             <span className="text-blue-400">Himalaya Crackers</span>. All Rights
             Reserved.
           </p>
-          <p className="text-xs tracking-wide">
-            Designed for a Premium Festive Experience
-          </p>
+          <p className="text-xs tracking-wide">Design by TeknoSpot</p>
         </div>
       </div>
     </footer>

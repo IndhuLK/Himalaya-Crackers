@@ -14,23 +14,22 @@ import {
   ShoppingCart,
   Heart,
   Share2,
+  Link2,
   ShieldCheck,
   Flame,
-  Clock,
   ChevronLeft,
   Minus,
   Plus,
-  PlayCircle,
-  Leaf,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Zap,
   Info,
 } from 'lucide-react';
 
+const FAVORITES_KEY = 'favoriteProducts';
+
 const ProductDetails = () => {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
 
@@ -40,28 +39,57 @@ const ProductDetails = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [openSection, setOpenSection] = useState('description');
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const docRef = doc(db, 'products', id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = { id: docSnap.id, ...docSnap.data() };
+        let data = null;
+
+        // Primary lookup using slug
+        const slugQuery = query(
+          collection(db, 'products'),
+          where('slug', '==', slug)
+        );
+        const slugSnapshot = await getDocs(slugQuery);
+
+        if (!slugSnapshot.empty) {
+          const first = slugSnapshot.docs[0];
+          data = { id: first.id, ...first.data() };
+        } else {
+          // Backward compatibility for older id-based links
+          const docRef = doc(db, 'products', slug);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            data = { id: docSnap.id, ...docSnap.data() };
+          }
+        }
+
+        if (data) {
           setProduct(data);
 
-          const q = query(
-            collection(db, 'products'),
-            where('category', '==', data.category)
+          // Build a balanced suggestion list: same category first, then mix from others.
+          const allProductsSnapshot = await getDocs(collection(db, 'products'));
+          const allProducts = allProductsSnapshot.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((p) => p.id !== data.id);
+
+          const sameCategory = allProducts.filter(
+            (p) => p.category === data.category
           );
-          const querySnapshot = await getDocs(q);
-          setRelatedProducts(
-            querySnapshot.docs
-              .map((d) => ({ id: d.id, ...d.data() }))
-              .filter((p) => p.id !== id)
-              .slice(0, 4)
+          const otherCategory = allProducts.filter(
+            (p) => p.category !== data.category
           );
+
+          setRelatedProducts([
+            ...sameCategory.slice(0, 2),
+            ...otherCategory.slice(0, 2),
+          ]);
+        } else {
+          setProduct(null);
         }
       } catch (error) {
         console.error(error);
@@ -71,7 +99,63 @@ const ProductDetails = () => {
     };
     fetchProduct();
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+
+    try {
+      const savedFavorites = JSON.parse(
+        localStorage.getItem(FAVORITES_KEY) || '[]'
+      );
+      setIsFavorite(savedFavorites.includes(product.id));
+    } catch (error) {
+      console.error(error);
+      setIsFavorite(false);
+    }
+  }, [product]);
+
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareText = product
+    ? `${product.name} - Himalaya Crackers`
+    : 'Check this product';
+
+  const whatsappShareUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
+  const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+  const smsShareUrl = `sms:?body=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
+
+  const openShareLink = (url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setShowShareMenu(false);
+  };
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleToggleFavorite = () => {
+    if (!product?.id) return;
+
+    try {
+      const savedFavorites = JSON.parse(
+        localStorage.getItem(FAVORITES_KEY) || '[]'
+      );
+      const nextFavorites = isFavorite
+        ? savedFavorites.filter((id) => id !== product.id)
+        : [...new Set([...savedFavorites, product.id])];
+
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(nextFavorites));
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   if (loading)
     return (
@@ -100,25 +184,82 @@ const ProductDetails = () => {
           >
             <ChevronLeft size={18} /> Back to Shop
           </button>
-          <div className="flex gap-4">
-            <button className="text-slate-400 hover:text-slate-900">
+          <div className="relative flex gap-4">
+            <button
+              onClick={() => setShowShareMenu((prev) => !prev)}
+              className="text-slate-400 hover:text-slate-900"
+              title="Share product"
+            >
               <Share2 size={18} />
             </button>
-            <button className="text-slate-400 hover:text-rose-500">
-              <Heart size={18} />
+            <button
+              onClick={handleToggleFavorite}
+              className={`${isFavorite ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}
+              title="Add to favorite"
+            >
+              <Heart size={18} className={isFavorite ? 'fill-rose-500' : ''} />
             </button>
+
+            {showShareMenu && (
+              <div className="absolute right-0 top-9 z-30 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                  Share Product
+                </p>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => openShareLink(whatsappShareUrl)}
+                    className="rounded-lg border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openShareLink(facebookShareUrl)}
+                    className="rounded-lg border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Facebook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openShareLink(smsShareUrl)}
+                    className="rounded-lg border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    SMS
+                  </button>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="mb-1 text-[11px] font-semibold text-slate-500">
+                    Product URL
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 truncate text-xs text-slate-700">
+                      {shareUrl}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyUrl}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Link2 size={12} />
+                      {copied ? 'Copied' : 'Copy URL'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
+      <main className="max-w-7xl mx-auto px-6 py-8 lg:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
           {/* IMAGE GALLERY (Span 7) */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="aspect-square rounded-[3rem] overflow-hidden bg-white border border-slate-100 shadow-2xl shadow-slate-200/40 relative">
+          <div className="lg:col-span-6 space-y-4 w-full max-w-140 lg:max-w-130 mx-auto">
+            <div className="aspect-square rounded-2xl overflow-hidden bg-white border border-slate-100 shadow-lg shadow-slate-200/30 relative">
               <img
                 src={product.images?.[activeImage]}
-                className="w-full h-full object-cover transition-transform duration-1000 hover:scale-110"
+                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
                 alt={product.name}
               />
               {!isAvailable && (
@@ -130,12 +271,12 @@ const ProductDetails = () => {
               )}
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-2 justify-center">
+            <div className="flex gap-3 overflow-x-auto pb-2 justify-center">
               {product.images?.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveImage(i)}
-                  className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 ${activeImage === i ? 'border-blue-600 scale-105 shadow-lg' : 'border-transparent opacity-40'}`}
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${activeImage === i ? 'border-blue-600 scale-105 shadow-md' : 'border-transparent opacity-50'}`}
                 >
                   <img src={img} className="w-full h-full object-cover" />
                 </button>
@@ -144,8 +285,8 @@ const ProductDetails = () => {
           </div>
 
           {/* PRODUCT INFO (Span 5) */}
-          <div className="lg:col-span-5 flex flex-col pt-4">
-            <div className="space-y-6">
+          <div className="lg:col-span-6 flex flex-col pt-1">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
                   {product.category}
@@ -157,15 +298,15 @@ const ProductDetails = () => {
                 )}
               </div>
 
-              <h1 className="text-5xl lg:text-6xl font-black tracking-tighter leading-[0.9] text-slate-900">
+              <h1 className="text-3xl lg:text-4xl font-black tracking-tight leading-tight text-slate-900">
                 {product.name}
               </h1>
 
-              <div className="flex items-baseline gap-4 pt-2">
-                <span className="text-5xl font-black text-blue-600 tracking-tighter">
+              <div className="flex items-baseline gap-3 pt-1">
+                <span className="text-3xl lg:text-4xl font-black text-blue-600 tracking-tight">
                   ₹{product.ourPrice}
                 </span>
-                <span className="text-xl text-slate-300 line-through font-bold">
+                <span className="text-lg text-slate-300 line-through font-bold">
                   ₹{product.mrpPrice}
                 </span>
                 <span className="text-emerald-500 font-black text-xs uppercase tracking-widest">
@@ -180,15 +321,15 @@ const ProductDetails = () => {
             </div>
 
             {/* ACTION AREA */}
-            <div className="mt-10 p-2 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-200/50 flex flex-col sm:flex-row gap-2">
-              <div className="flex items-center justify-between bg-slate-50 rounded-4xl-6 py-4 sm:w-44">
+            <div className="mt-6 p-2 bg-white border border-slate-100 rounded-2xl shadow-lg shadow-slate-200/35 flex flex-col sm:flex-row gap-2">
+              <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3 sm:w-36">
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   className="text-slate-400 hover:text-slate-900"
                 >
                   <Minus size={18} />
                 </button>
-                <span className="font-black text-xl">{quantity}</span>
+                <span className="font-black text-lg">{quantity}</span>
                 <button
                   onClick={() => setQuantity((q) => q + 1)}
                   className="text-slate-400 hover:text-slate-900"
@@ -199,25 +340,16 @@ const ProductDetails = () => {
               <button
                 onClick={() => addToCart(product, quantity)}
                 disabled={!isAvailable}
-                className="flex-1 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-4xl py-5 font-black text-lg transition-all flex items-center justify-center gap-3"
+                className="flex-1 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-xl py-3.5 font-black text-base transition-all flex items-center justify-center gap-2"
               >
-                <ShoppingCart size={22} /> Add to Cart
+                <ShoppingCart size={18} /> Add to Cart
               </button>
             </div>
 
             {/* QUICK SPECS */}
-            <div className="grid grid-cols-2 gap-4 mt-8">
-              <div className="p-6 rounded-4xl bg-slate-50 border border-slate-100">
-                <Clock size={24} className="text-blue-500 mb-3" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Duration
-                </p>
-                <p className="font-black text-slate-800">
-                  {product.duration} Seconds
-                </p>
-              </div>
-              <div className="p-6 rounded-4xl bg-slate-50 border border-slate-100">
-                <Zap size={24} className="text-yellow-500 mb-3" />
+            <div className="grid grid-cols-1 gap-3 mt-6">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <Zap size={20} className="text-yellow-500 mb-2" />
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Intensity
                 </p>
@@ -228,7 +360,7 @@ const ProductDetails = () => {
             </div>
 
             {/* MODERN DROPDOWNS */}
-            <div className="mt-10 space-y-1">
+            <div className="mt-6 space-y-1">
               {[
                 {
                   id: 'description',
@@ -253,7 +385,7 @@ const ProductDetails = () => {
                         openSection === section.id ? null : section.id
                       )
                     }
-                    className="w-full py-5 flex items-center justify-between group transition-all"
+                    className="w-full py-4 flex items-center justify-between group transition-all"
                   >
                     <span className="flex items-center gap-3 font-black text-xs uppercase tracking-[0.2em] text-slate-400 group-hover:text-blue-600 transition-colors">
                       {section.icon} {section.label}
@@ -265,9 +397,9 @@ const ProductDetails = () => {
                     )}
                   </button>
                   <div
-                    className={`overflow-hidden transition-all duration-500 ease-in-out ${openSection === section.id ? 'max-h-96 pb-8' : 'max-h-0'}`}
+                    className={`overflow-hidden transition-all duration-500 ease-in-out ${openSection === section.id ? 'max-h-80 pb-6' : 'max-h-0'}`}
                   >
-                    <p className="text-slate-600 leading-relaxed text-base font-medium">
+                    <p className="text-slate-600 leading-relaxed text-sm font-medium">
                       {section.content ||
                         'Experience high-quality fireworks designed for safety and visual excellence.'}
                     </p>
@@ -280,28 +412,28 @@ const ProductDetails = () => {
 
         {/* RELATED EFFECTS */}
         {relatedProducts.length > 0 && (
-          <section className="mt-32 border-t border-slate-100 pt-16">
-            <h3 className="text-3xl font-black tracking-tighter italic mb-12">
-              COMPLEMENTARY EFFECTS
+          <section className="mt-14 border-t border-slate-100 pt-10">
+            <h3 className="text-2xl font-black tracking-tight mb-6">
+              Suggested Products
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
               {relatedProducts.map((rp) => (
                 <div
                   key={rp.id}
-                  onClick={() => navigate(`/product/${rp.id}`)}
+                  onClick={() => navigate(`/product/${rp.slug || rp.id}`)}
                   className="group cursor-pointer"
                 >
-                  <div className="aspect-square rounded-4xl bg-white border border-slate-100 overflow-hidden mb-5 shadow-sm group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-500">
+                  <div className="aspect-square rounded-2xl bg-white border border-slate-100 overflow-hidden mb-3 shadow-sm group-hover:shadow-lg group-hover:-translate-y-1 transition-all duration-300">
                     <img
                       src={rp.images?.[0]}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
-                  <h4 className="font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase text-sm tracking-tight">
+                  <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-sm leading-snug line-clamp-2">
                     {rp.name}
                   </h4>
-                  <div className="flex gap-2 mt-1">
-                    <span className="font-black text-blue-600">
+                  <div className="flex gap-2 mt-1 items-baseline">
+                    <span className="font-bold text-blue-600">
                       ₹{rp.ourPrice}
                     </span>
                     <span className="text-slate-300 line-through font-bold text-sm">

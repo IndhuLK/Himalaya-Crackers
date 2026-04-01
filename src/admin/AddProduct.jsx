@@ -19,10 +19,17 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
-  getDocs,
   onSnapshot,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const toSlug = (value = '') =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 
 export default function AddProduct() {
   const fileInputRef = useRef(null);
@@ -32,15 +39,23 @@ export default function AddProduct() {
 
   // 2. State for categories and loading
   const [categories, setCategories] = useState([]);
-  const [newCatName, setNewCatName] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [loadingCats, setLoadingCats] = useState(true);
+  const [noiseOptions, setNoiseOptions] = useState([
+    'Low Noise',
+    'Medium Noise',
+    'High Noise',
+  ]);
 
   const [formData, setFormData] = useState({
     name: '',
+    slug: '',
     category: '',
+    categorySlug: '',
     subCategory: '',
     mrpPrice: '',
     ourPrice: '',
@@ -48,8 +63,11 @@ export default function AddProduct() {
     noiseSubCategory: '',
     duration: '',
     isGreen: false,
+    isEcoFriendly: false,
     longDescription: '',
     safetyInstructions: '',
+    highlightType: 'none',
+    offerPercentage: '',
     isBestSeller: false,
     isFestivalSpecial: false,
     isOutOfStock: false,
@@ -60,7 +78,31 @@ export default function AddProduct() {
   // Load product data if editing
   useEffect(() => {
     if (location.state?.product) {
-      setFormData(location.state.product);
+      const product = location.state.product;
+      setFormData((prev) => ({
+        ...prev,
+        ...product,
+        slug: product.slug || toSlug(product.name || ''),
+        categorySlug: product.categorySlug || toSlug(product.category || ''),
+        noiseSubCategory: product.noiseLevel || prev.noiseSubCategory || '',
+        highlightType:
+          product.highlightType ||
+          (Number(product.offerPercentage) > 0
+            ? 'offer'
+            : product.isBestSeller
+              ? 'bestSeller'
+              : product.isFestivalSpecial
+                ? 'festival'
+                : 'none'),
+        offerPercentage:
+          product.offerPercentage !== undefined
+            ? String(product.offerPercentage || '')
+            : prev.offerPercentage,
+        isEcoFriendly:
+          product.isEcoFriendly !== undefined
+            ? product.isEcoFriendly
+            : Boolean(product.isGreen),
+      }));
     }
   }, [location.state]);
 
@@ -97,10 +139,33 @@ export default function AddProduct() {
       return;
     }
 
+    if (formData.highlightType === 'offer' && !formData.offerPercentage) {
+      toast.warning('Please enter offer percentage');
+      return;
+    }
+
     setIsSaving(true);
     try {
+      const selectedCategory = categories.find(
+        (cat) => cat.name === formData.category
+      );
+
       const productData = {
         ...formData,
+        isGreen: Boolean(formData.isEcoFriendly),
+        isEcoFriendly: Boolean(formData.isEcoFriendly),
+        isOutOfStock: Number(formData.stockQty || 0) <= 0,
+        isBestSeller: formData.highlightType === 'bestSeller',
+        isFestivalSpecial: formData.highlightType === 'festival',
+        offerPercentage:
+          formData.highlightType === 'offer'
+            ? Number(formData.offerPercentage || 0)
+            : 0,
+        slug: formData.slug || toSlug(formData.name),
+        categorySlug:
+          formData.categorySlug ||
+          selectedCategory?.slug ||
+          toSlug(formData.category),
         mrpPrice: Number(formData.mrpPrice),
         ourPrice: Number(formData.ourPrice),
         stockQty: Number(formData.stockQty),
@@ -132,28 +197,106 @@ export default function AddProduct() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'categories'), (snap) => {
-      const catList = snap.docs.map((doc) => doc.data().name);
+      const catList = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((cat) => cat.isActive !== false && cat.name)
+        .map((cat) => ({
+          id: cat.id,
+          name: cat.name.trim(),
+          slug: cat.slug || toSlug(cat.name),
+        }));
       setCategories(catList);
       setLoadingCats(false);
     });
     return () => unsub();
   }, []);
 
-  const addNewCategory = async () => {
-    const formattedName = newCatName.trim();
-    if (formattedName && !categories.includes(formattedName)) {
+  const normalizedCategorySearch = categorySearch.trim().toLowerCase();
+  const filteredCategories = categories.filter((cat) => {
+    if (!normalizedCategorySearch) return true;
+    return cat.name.toLowerCase().includes(normalizedCategorySearch);
+  });
+  const hasExactCategoryMatch = categories.some(
+    (cat) => cat.name.toLowerCase() === normalizedCategorySearch
+  );
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
+      const dynamicNoise = snap.docs
+        .map((doc) => doc.data()?.noiseLevel)
+        .filter(Boolean);
+
+      const merged = [
+        'Low Noise',
+        'Medium Noise',
+        'High Noise',
+        ...dynamicNoise,
+      ];
+      const uniqueNoise = [...new Set(merged.map((v) => String(v).trim()))];
+      setNoiseOptions(uniqueNoise);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const addNewCategory = async (nameInput) => {
+    const formattedName = (nameInput ?? categorySearch).trim();
+    const exists = categories.some(
+      (cat) => cat.name.toLowerCase() === formattedName.toLowerCase()
+    );
+    if (formattedName && !exists) {
       try {
+        const newSlug = toSlug(formattedName);
         await addDoc(collection(db, 'categories'), {
           name: formattedName,
+          slug: newSlug,
+          isActive: true,
           createdAt: serverTimestamp(),
         });
-        setFormData({ ...formData, category: formattedName });
-        setNewCatName('');
+        setFormData({
+          ...formData,
+          category: formattedName,
+          categorySlug: newSlug,
+        });
+        setCategorySearch('');
+        setIsCategoryDropdownOpen(false);
+        toast.success(`Category "${formattedName}" created and selected!`);
       } catch (err) {
-        console.error('Error adding category', err);
-        toast.error('Failed to add category');
+        console.error(err);
+        toast.error('Failed to create category');
+      }
+      return;
+    }
+
+    if (formattedName && exists) {
+      const selected = categories.find(
+        (cat) => cat.name.toLowerCase() === formattedName.toLowerCase()
+      );
+      if (selected) {
+        setFormData({
+          ...formData,
+          category: selected.name,
+          categorySlug: selected.slug,
+        });
+        setCategorySearch('');
+        setIsCategoryDropdownOpen(false);
       }
     }
+  };
+
+  const handleCategoryInputChange = (value) => {
+    setCategorySearch(value);
+    setIsCategoryDropdownOpen(true);
+  };
+
+  const handleCategorySelect = (selected) => {
+    setFormData({
+      ...formData,
+      category: selected.name,
+      categorySlug: selected.slug,
+    });
+    setCategorySearch('');
+    setIsCategoryDropdownOpen(false);
   };
 
   return (
@@ -238,28 +381,6 @@ export default function AddProduct() {
             </div>
           </div>
 
-          {/* New Category Input UI */}
-          <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-medium text-gray-900 border-b border-gray-100 pb-2">
-              Add New Category
-            </h3>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="e.g. Sparklers, Fancy Rockets"
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <button
-                onClick={addNewCategory}
-                className="w-full bg-gray-100 text-gray-700 text-sm font-medium py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-              >
-                <PlusCircle size={16} /> Save Category
-              </button>
-            </div>
-          </div>
-
           {/* Video URL */}
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
@@ -294,34 +415,126 @@ export default function AddProduct() {
                   type="text"
                   value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData({
+                      ...formData,
+                      name: e.target.value,
+                      slug: toSlug(e.target.value),
+                    })
                   }
                   className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="e.g. 5000 Wala Mega Garland"
                 />
               </div>
 
-              {/* Categories Dropdown Section */}
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-gray-700">
+                  Slug
+                </label>
+                <input
+                  type="text"
+                  value={formData.slug}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      slug: toSlug(e.target.value),
+                    })
+                  }
+                  className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="auto-generated-product-slug"
+                />
+              </div>
+
+              {/* Categories Searchable Input */}
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">
                   Category <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                >
-                  <option value="">
-                    {loadingCats ? 'Loading...' : 'Select Category'}
-                  </option>
-                  {categories.map((cat, idx) => (
-                    <option key={idx} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={
+                      loadingCats
+                        ? 'Loading...'
+                        : formData.category
+                          ? `Selected: ${formData.category} | Search or type new category`
+                          : 'Search or type new category'
+                    }
+                    value={categorySearch || formData.category}
+                    onChange={(e) => handleCategoryInputChange(e.target.value)}
+                    onFocus={() => setIsCategoryDropdownOpen(true)}
+                    onKeyDown={(e) => {
+                      const typed = categorySearch.trim();
+                      if (e.key === 'Escape') {
+                        setIsCategoryDropdownOpen(false);
+                        return;
+                      }
+                      if (e.key === 'Enter' && typed) {
+                        e.preventDefault();
+                        const exact = categories.find(
+                          (c) => c.name.toLowerCase() === typed.toLowerCase()
+                        );
+                        if (exact) {
+                          handleCategorySelect(exact);
+                        } else {
+                          addNewCategory(typed);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setIsCategoryDropdownOpen(false), 120);
+                      const typed = categorySearch.trim();
+                      if (!typed) return;
+                      const selected = categories.find(
+                        (cat) => cat.name.toLowerCase() === typed.toLowerCase()
+                      );
+                      if (selected) {
+                        handleCategorySelect(selected);
+                      }
+                    }}
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+
+                  {isCategoryDropdownOpen && (
+                    <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                      {filteredCategories.map((cat) => (
+                        <button
+                          key={cat.id || cat.slug}
+                          type="button"
+                          onMouseDown={() => handleCategorySelect(cat)}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+
+                      {normalizedCategorySearch && !hasExactCategoryMatch && (
+                        <button
+                          type="button"
+                          onMouseDown={() =>
+                            addNewCategory(categorySearch.trim())
+                          }
+                          className="w-full border-t border-gray-100 px-3 py-2 text-left text-sm font-medium text-blue-600 hover:bg-blue-50"
+                        >
+                          + Create "{categorySearch.trim()}"
+                        </button>
+                      )}
+
+                      {filteredCategories.length === 0 &&
+                        (!normalizedCategorySearch ||
+                          hasExactCategoryMatch) && (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            No categories found
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+
+                {!categorySearch && formData.category && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Selected category: {formData.category}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -340,61 +553,70 @@ export default function AddProduct() {
               </div>
             </div>
 
-            {/* Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-gray-100">
-              <label className="flex items-center gap-2 cursor-pointer p-2 border border-transparent hover:bg-gray-50 rounded-md transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.isBestSeller}
-                  onChange={(e) =>
-                    setFormData({ ...formData, isBestSeller: e.target.checked })
-                  }
-                  className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="text-xs font-medium text-gray-700">
-                  Best Seller
-                </span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer p-2 border border-transparent hover:bg-gray-50 rounded-md transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.isFestivalSpecial}
+            {/* Highlights */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">
+                  Highlights
+                </label>
+                <select
+                  value={formData.highlightType}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      isFestivalSpecial: e.target.checked,
+                      highlightType: e.target.value,
+                      offerPercentage:
+                        e.target.value === 'offer'
+                          ? formData.offerPercentage
+                          : '',
                     })
                   }
-                  className="rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="text-xs font-medium text-gray-700">
-                  Festival
-                </span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer p-2 border border-transparent hover:red-50 rounded-md transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.isOutOfStock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, isOutOfStock: e.target.checked })
-                  }
-                  className="rounded text-red-600 focus:ring-red-500 border-gray-300"
-                />
-                <span className="text-xs font-medium text-red-600">
-                  Out of Stock
-                </span>
-              </label>
+                  className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                >
+                  <option value="none">None</option>
+                  <option value="bestSeller">Best Seller</option>
+                  <option value="festival">Festival</option>
+                  <option value="offer">Off with Percentage</option>
+                </select>
+              </div>
+
+              {formData.highlightType === 'offer' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
+                    Offer Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={formData.offerPercentage}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        offerPercentage: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g. 25"
+                  />
+                </div>
+              )}
+
               <label className="flex items-center gap-2 cursor-pointer p-2 border border-transparent hover:bg-green-50 rounded-md transition-colors">
                 <input
                   type="checkbox"
-                  checked={formData.isGreen}
+                  checked={formData.isEcoFriendly}
                   onChange={(e) =>
-                    setFormData({ ...formData, isGreen: e.target.checked })
+                    setFormData({
+                      ...formData,
+                      isEcoFriendly: e.target.checked,
+                      isGreen: e.target.checked,
+                    })
                   }
                   className="rounded text-green-600 focus:ring-green-500 border-gray-300"
                 />
                 <span className="text-xs font-medium text-green-700">
-                  Green Only
+                  Eco Friendly
                 </span>
               </label>
             </div>
@@ -454,9 +676,12 @@ export default function AddProduct() {
                   }
                   className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none"
                 >
-                  <option value="Low Noise">Low Noise</option>
-                  <option value="Medium Noise">Medium Noise</option>
-                  <option value="High Noise">High Noise</option>
+                  <option value="">Select Noise Level</option>
+                  {noiseOptions.map((noiseName) => (
+                    <option key={noiseName} value={noiseName}>
+                      {noiseName}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

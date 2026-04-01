@@ -27,7 +27,7 @@ const Hero = () => {
 
   if (!slides.length)
     return (
-      <div className="h-[60vh] flex items-center justify-center bg-slate-100">
+      <div className="h-[45vh] flex items-center justify-center bg-slate-100">
         No banners yet
       </div>
     );
@@ -35,7 +35,7 @@ const Hero = () => {
   const slide = slides[current];
 
   return (
-    <section className="relative h-[80vh] md:h-[85vh] overflow-hidden">
+    <section className="relative h-[58vh] min-h-105 md:h-[68vh] lg:h-[74vh] overflow-hidden">
       {/* Background Image with smooth transition */}
       {slides.map((s, i) => (
         <div
@@ -52,8 +52,8 @@ const Hero = () => {
       ))}
 
       {/* Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+      <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-black/10" />
+      <div className="absolute inset-0 bg-linear-to-r from-black/30 to-transparent" />
 
       {/* Content */}
       <div className="relative h-full flex items-center">
@@ -63,20 +63,20 @@ const Hero = () => {
               key={current}
               className="animate-in fade-in slide-in-from-bottom-6 duration-700"
             >
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight mb-5 leading-[1.1]">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight mb-4 leading-[1.1]">
                 {slide.title}
               </h1>
-              <h2 className="text-lg md:text-2xl font-medium text-white/80 mb-4">
+              <h2 className="text-base md:text-xl font-medium text-white/80 mb-3">
                 {slide.subtitle}
               </h2>
-              <p className="mb-8 text-white/60 md:text-lg max-w-xl leading-relaxed">
+              <p className="mb-6 text-white/70 md:text-base max-w-xl leading-relaxed">
                 {slide.desc}
               </p>
 
               {slide.buttonText && (
                 <Link
                   to="/products"
-                  className="inline-flex items-center gap-2 bg-white text-gray-900 hover:bg-orange-500 hover:text-white px-8 py-4 rounded-full font-bold transition-all duration-300 shadow-xl hover:shadow-orange-500/30 transform hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-2 bg-white text-gray-900 hover:bg-orange-500 hover:text-white px-6 py-3 rounded-full font-bold transition-all duration-300 shadow-xl hover:shadow-orange-500/30 transform hover:-translate-y-0.5"
                 >
                   {slide.buttonText}
                   <ChevronRight size={18} />
@@ -88,7 +88,7 @@ const Hero = () => {
       </div>
 
       {/* Slide Indicators */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2">
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2">
         {slides.map((_, i) => (
           <button
             key={i}

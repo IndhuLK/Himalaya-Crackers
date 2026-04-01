@@ -2,14 +2,16 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpenText,
   ShoppingBag,
-  Package,
+  FileText,
   Images,
   LayoutDashboard,
-  PlusCircle,
-  ListChecks,
   ChevronDown,
   LogOut,
   BarChart,
+  FolderTree,
+  Package,
+  PlusCircle,
+  ListChecks,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -20,17 +22,17 @@ const menus = [
     icon: <LayoutDashboard size={18} />,
   },
   {
-    name: 'Items',
+    name: 'Product Management',
     icon: <Package size={18} />,
     isSubmenu: true,
     subItems: [
       {
-        name: 'New Item',
+        name: 'New Product',
         path: '/admin/add-product',
         icon: <PlusCircle size={16} />,
       },
       {
-        name: 'Item List',
+        name: 'Product List',
         path: '/admin/products',
         icon: <ListChecks size={16} />,
       },
@@ -38,9 +40,19 @@ const menus = [
   },
   { name: 'Inventory', path: '/admin/inventory', icon: <BarChart size={18} /> },
   {
+    name: 'Category Management',
+    path: '/admin/categories',
+    icon: <FolderTree size={18} />,
+  },
+  {
     name: 'Sales Orders',
     path: '/admin/orders',
     icon: <ShoppingBag size={18} />,
+  },
+  {
+    name: 'Invoices',
+    path: '/admin/invoices',
+    icon: <FileText size={18} />,
   },
   {
     name: 'Store Sliders',
@@ -52,7 +64,9 @@ const menus = [
 export default function Sidebar({ isOpen, setIsOpen, isMobile }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [expandedMenus, setExpandedMenus] = useState({ Items: true });
+  const [expandedMenus, setExpandedMenus] = useState({
+    'Product Management': true,
+  });
 
   const toggleSubmenu = (name) => {
     setExpandedMenus((prev) => ({ ...prev, [name]: !prev[name] }));
