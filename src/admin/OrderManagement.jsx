@@ -762,6 +762,8 @@ export default function OrderManagement() {
               margin: 0;
               padding: 0;
               box-sizing: border-box;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
 
             body {
@@ -836,6 +838,7 @@ export default function OrderManagement() {
               grid-template-columns: 1fr 1fr;
               gap: 30px;
               margin-bottom: 30px;
+              page-break-inside: avoid;
             }
 
             .info-box h3 {
@@ -895,6 +898,16 @@ export default function OrderManagement() {
             table {
               width: 100%;
               border-collapse: collapse;
+              page-break-inside: auto;
+            }
+
+            tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+
+            thead {
+              display: table-header-group;
             }
 
             table thead {
@@ -917,11 +930,16 @@ export default function OrderManagement() {
               text-align: right;
             }
 
+            table td {
+              page-break-inside: avoid;
+            }
+
             /* TOTALS */
             .totals-section {
               display: flex;
               justify-content: flex-end;
               margin-bottom: 30px;
+              page-break-inside: avoid;
             }
 
             .totals-box {
@@ -963,6 +981,7 @@ export default function OrderManagement() {
               padding-top: 20px;
               border-top: 1px solid #d1d5db;
               text-align: center;
+              page-break-inside: avoid;
             }
 
             .footer p {
@@ -977,10 +996,19 @@ export default function OrderManagement() {
               body {
                 padding: 0;
                 background: white;
+                margin: 0;
               }
 
               .container {
                 box-shadow: none;
+                margin: 0;
+                padding: 15px;
+                width: 100%;
+                max-width: 100%;
+              }
+
+              @page {
+                margin: 10mm;
               }
             }
           </style>

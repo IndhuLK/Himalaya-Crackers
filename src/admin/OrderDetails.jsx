@@ -437,7 +437,7 @@ export default function OrderDetails() {
         <head>
           <title>${invoiceNumber}</title>
           <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; background: #ffffff; padding: 20px; line-height: 1.5; }
             .container { max-width: 900px; margin: 0 auto; background: #ffffff; }
             .accent-line { height: 3px; background: #1f2937; margin-bottom: 30px; }
@@ -448,7 +448,7 @@ export default function OrderDetails() {
             .header-right h2 { font-size: 24px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
             .header-right .order-label { font-size: 12px; color: #6b7280; margin-bottom: 2px; }
             .header-right .order-number { font-size: 14px; font-weight: 600; color: #1f2937; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; page-break-inside: avoid; }
             .info-box h3 { font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db; }
             .info-box p { font-size: 13px; color: #374151; line-height: 1.6; margin-bottom: 4px; }
             .info-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1d5db; }
@@ -456,19 +456,27 @@ export default function OrderDetails() {
             .info-value { font-size: 13px; color: #1f2937; font-weight: 500; }
             .table-section { margin-bottom: 30px; }
             .table-section h3 { font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db; }
-            table { width: 100%; border-collapse: collapse; }
+            table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
             table thead { background: #1f2937; color: white; }
             table th { padding: 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+            table td { page-break-inside: avoid; }
             table th:nth-child(2), table th:nth-child(3), table th:nth-child(4) { text-align: right; }
-            .totals-section { display: flex; justify-content: flex-end; margin-bottom: 30px; }
+            .totals-section { display: flex; justify-content: flex-end; margin-bottom: 30px; page-break-inside: avoid; }
             .totals-box { width: 280px; border: 1px solid #d1d5db; }
             .total-row { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #d1d5db; font-size: 13px; }
             .total-row .label { color: #6b7280; font-weight: 500; }
             .total-row .value { color: #1f2937; font-weight: 600; }
             .grand-total { display: flex; justify-content: space-between; padding: 14px 15px; background: #1f2937; color: white; font-size: 14px; font-weight: 700; }
-            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #d1d5db; text-align: center; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #d1d5db; text-align: center; page-break-inside: avoid; }
             .footer p { font-size: 12px; color: #6b7280; line-height: 1.6; margin-bottom: 4px; }
-            @media print { body { padding: 0; background: white; } .container { box-shadow: none; } }
+            @media print { 
+              body { padding: 0; background: white; margin: 0; } 
+              .container { box-shadow: none; margin: 0; padding: 15px; width: 100%; max-width: 100%; } 
+              @page { margin: 10mm; }
+            }
           </style>
         </head>
         <body>
